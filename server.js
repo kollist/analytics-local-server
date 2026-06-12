@@ -145,7 +145,7 @@ app.get('/api/stats', (req, res) => {
     FROM events
     WHERE event_type = 'screen_enter' AND screen_name IN (
       'Splash','Login','Signup','Home','Categories',
-      'ProductList','ProductDetail','Cart','Checkout','OrderPlaced'
+      'ProductList','ProductDetail','Cart','Checkout'
     )
     ${appSlug ? 'AND app_slug = ?' : ''}
     GROUP BY screen_name
@@ -156,6 +156,10 @@ app.get('/api/stats', (req, res) => {
     WHERE event_type = 'purchase'
     ${appSlug ? 'AND app_slug = ?' : ''}
   `).get(...args).n;
+
+  // "OrderPlaced" funnel step is driven by the purchase event, not a screen_enter
+  // — the OrderPlaced screen doesn't always fire reliably.
+  funnel.push({ screen_name: 'OrderPlaced', sessions: purchaseSessions });
 
   const conversionRate = sessions > 0 ? (purchaseSessions / sessions) * 100 : 0;
 
