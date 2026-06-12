@@ -51,6 +51,8 @@
   .badge-exit   { background: rgba(239,68,68,.15);   color: var(--red); }
   .badge-event  { background: rgba(108,99,255,.15); color: var(--accent); }
   .badge-login  { background: rgba(245,158,11,.15); color: var(--yellow); }
+  .badge-guest  { background: rgba(100,116,139,.15); color: var(--muted); }
+  .badge-user   { background: rgba(34,197,94,.15);  color: var(--green); }
 
   /* funnel */
   .funnel { display: flex; flex-direction: column; gap: 8px; }
@@ -263,7 +265,9 @@ function prependRow(e) {
   const tr = document.createElement('tr');
   const props = e.properties ? JSON.stringify(typeof e.properties === 'string' ? JSON.parse(e.properties) : e.properties) : '';
   const dur  = e.duration_ms != null ? `${(e.duration_ms/1000).toFixed(1)}s` : '';
-  const uid  = e.user_id || e.anonymous_id?.slice(0,8) + '…';
+  const uid = e.user_id
+    ? `<span class="badge badge-user" title="${escapeHtml(e.user_id)}">User</span>`
+    : `<span class="badge badge-guest" title="${escapeHtml(e.anonymous_id || '')}">Guest</span>`;
   tr.innerHTML = `
     <td class="ts">${fmt(e.timestamp)}</td>
     <td class="ts">${e.app_slug || ''}</td>
@@ -293,6 +297,7 @@ function labelize(key) {
 
 function formatValue(value) {
   if (value === null || value === undefined || value === '') return '<span class="props-empty">—</span>';
+  if (typeof value === 'object' && value !== null && 'raw' in value) return value.raw;
   if (typeof value === 'boolean') return value ? 'Yes' : 'No';
   if (typeof value === 'object') {
     return `<pre style="white-space:pre-wrap;font-family:inherit;font-size:12px;color:var(--text)">${escapeHtml(JSON.stringify(value, null, 2))}</pre>`;
@@ -310,6 +315,7 @@ function showEventDetail(e) {
     ['Type',        e.event_type],
     ['Screen',      e.screen_name],
     ['Duration',    dur],
+    ['User Type',   { raw: e.user_id ? '<span class="badge badge-user">User</span>' : '<span class="badge badge-guest">Guest</span>' }],
     ['User ID',     e.user_id],
     ['Anonymous ID', e.anonymous_id],
     ['Session ID',  e.session_id],
