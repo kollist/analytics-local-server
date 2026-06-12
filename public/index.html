@@ -1,0 +1,392 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Analytics Dashboard</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #0f1117; --surface: #1a1d27; --border: #2a2d3a;
+    --accent: #6c63ff; --green: #22c55e; --yellow: #f59e0b;
+    --red: #ef4444; --text: #e2e8f0; --muted: #64748b;
+    --font: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  }
+
+  body { background: var(--bg); color: var(--text); font-family: var(--font); font-size: 14px; }
+
+  header {
+    background: var(--surface); border-bottom: 1px solid var(--border);
+    padding: 16px 24px; display: flex; align-items: center; gap: 12px;
+  }
+  header h1 { font-size: 18px; font-weight: 700; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--green);
+         animation: pulse 2s infinite; margin-left: auto; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.3} }
+  .live-label { font-size: 12px; color: var(--green); }
+
+  .grid { display: grid; grid-template-columns: repeat(4,1fr); gap: 16px; padding: 24px 24px 0; }
+
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 20px; }
+  .card h2 { font-size: 11px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); margin-bottom: 8px; }
+  .card .big { font-size: 36px; font-weight: 700; }
+
+  .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; padding: 16px 24px 0; }
+  .full-col { padding: 16px 24px 24px; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th { text-align: left; color: var(--muted); font-weight: 600; font-size: 11px;
+       text-transform: uppercase; letter-spacing: .06em;
+       border-bottom: 1px solid var(--border); padding: 8px 10px; }
+  td { padding: 8px 10px; border-bottom: 1px solid var(--border); }
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: rgba(255,255,255,.03); }
+
+  .badge {
+    display: inline-block; padding: 2px 8px; border-radius: 99px;
+    font-size: 11px; font-weight: 600;
+  }
+  .badge-enter  { background: rgba(34,197,94,.15);  color: var(--green); }
+  .badge-exit   { background: rgba(239,68,68,.15);   color: var(--red); }
+  .badge-event  { background: rgba(108,99,255,.15); color: var(--accent); }
+  .badge-login  { background: rgba(245,158,11,.15); color: var(--yellow); }
+
+  /* funnel */
+  .funnel { display: flex; flex-direction: column; gap: 8px; }
+  .funnel-row { display: flex; align-items: center; gap: 10px; }
+  .funnel-label { width: 120px; font-size: 12px; color: var(--muted); flex-shrink: 0; text-align: right; }
+  .funnel-bar-wrap { flex: 1; background: var(--border); border-radius: 4px; height: 22px; overflow: hidden; }
+  .funnel-bar { height: 100%; background: var(--accent); border-radius: 4px; transition: width .6s ease; display: flex; align-items: center; padding-left: 8px; font-size: 12px; font-weight: 600; min-width: 30px; }
+  .funnel-pct { width: 46px; text-align: right; font-size: 12px; color: var(--muted); }
+
+  /* live feed */
+  #feed { max-height: 380px; overflow-y: auto; }
+  #feed tr { animation: fadeIn .3s ease; }
+  @keyframes fadeIn { from{opacity:0; transform:translateY(-4px)} to{opacity:1; transform:none} }
+  .ts { color: var(--muted); font-size: 11px; }
+  .props { color: var(--muted); font-size: 11px; max-width: 280px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+  #feed tr { cursor: pointer; }
+
+  /* event detail modal */
+  .modal-overlay {
+    display: none; position: fixed; inset: 0; background: rgba(0,0,0,.5);
+    align-items: center; justify-content: center; z-index: 100;
+  }
+  .modal-overlay.open { display: flex; }
+  .modal {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
+    width: 560px; max-width: 90vw; max-height: 85vh; overflow-y: auto;
+    padding: 24px;
+  }
+  .modal-header { display: flex; align-items: center; gap: 10px; margin-bottom: 16px; }
+  .modal-header h3 { font-size: 16px; font-weight: 700; flex: 1; }
+  .modal-close {
+    background: none; border: none; color: var(--muted); font-size: 20px;
+    cursor: pointer; line-height: 1; padding: 4px;
+  }
+  .modal-close:hover { color: var(--text); }
+  .detail-table { width: 100%; border-collapse: collapse; font-size: 13px; margin-bottom: 16px; }
+  .detail-table tr td { padding: 6px 10px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  .detail-table tr:last-child td { border-bottom: none; }
+  .detail-table td:first-child {
+    color: var(--muted); font-weight: 600; white-space: nowrap; width: 130px;
+  }
+  .detail-table td:last-child { word-break: break-word; }
+  .modal h4 { font-size: 11px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); margin-bottom: 8px; }
+  .props-empty { color: var(--muted); font-style: italic; font-size: 13px; }
+</style>
+</head>
+<body>
+
+<header>
+  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#6c63ff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+  </svg>
+  <h1>Analytics · Local Dev</h1>
+  <select id="app-filter" style="margin-left:16px; background:var(--surface); color:var(--text); border:1px solid var(--border); border-radius:6px; padding:4px 8px;">
+    <option value="">All apps</option>
+  </select>
+  <div class="live-label">LIVE</div>
+  <div class="dot"></div>
+</header>
+
+<!-- KPI row -->
+<div class="grid">
+  <div class="card"><h2>Total Events</h2><div class="big" id="kpi-total">—</div></div>
+  <div class="card"><h2>Sessions</h2><div class="big" id="kpi-sessions">—</div></div>
+  <div class="card"><h2>Unique Users</h2><div class="big" id="kpi-users">—</div></div>
+  <div class="card"><h2>Conversion Rate</h2><div class="big" id="kpi-conversion">—</div></div>
+</div>
+
+<!-- Funnel + event types -->
+<div class="two-col">
+  <div class="card">
+    <h2>Ordering Funnel</h2>
+    <br/>
+    <div class="funnel" id="funnel"></div>
+  </div>
+  <div class="card">
+    <h2>Events by Type</h2>
+    <br/>
+    <table>
+      <thead><tr><th>Type</th><th>Count</th></tr></thead>
+      <tbody id="event-types"></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Screen time -->
+<div class="two-col">
+  <div class="card">
+    <h2>Avg Time per Screen (seconds)</h2>
+    <br/>
+    <table>
+      <thead><tr><th>Screen</th><th>Avg s</th><th>Views</th></tr></thead>
+      <tbody id="screen-time"></tbody>
+    </table>
+  </div>
+  <div class="card">
+    <!-- placeholder for future chart -->
+    <h2>Drop-off Guide</h2>
+    <br/>
+    <p style="color:var(--muted);font-size:13px;line-height:1.7">
+      Compare funnel stages to find where users stop.<br><br>
+      <b style="color:var(--text)">Low Cart → Checkout</b> = pricing or UX friction on the cart screen.<br><br>
+      <b style="color:var(--text)">High ProductDetail time</b> = users are confused about modifiers.<br><br>
+      <b style="color:var(--text)">Many Login exits</b> = sign-in friction, consider guest checkout.
+    </p>
+  </div>
+</div>
+
+<!-- Live feed -->
+<div class="full-col">
+  <div class="card">
+    <h2>Live Event Feed</h2>
+    <br/>
+    <table>
+      <thead>
+        <tr>
+          <th>Time</th><th>App</th><th>Type</th><th>Screen</th>
+          <th>Duration</th><th>User</th><th>Properties</th>
+        </tr>
+      </thead>
+      <tbody id="feed"></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Event detail modal -->
+<div class="modal-overlay" id="event-modal">
+  <div class="modal">
+    <div class="modal-header">
+      <h3 id="modal-title">Event</h3>
+      <button class="modal-close" id="modal-close" aria-label="Close">&times;</button>
+    </div>
+    <table class="detail-table" id="modal-detail"></table>
+    <h4>Properties</h4>
+    <table class="detail-table" id="modal-props"></table>
+  </div>
+</div>
+
+<script>
+const FUNNEL_ORDER = ['Splash','Login','Signup','Home','Categories','ProductList','ProductDetail','Cart','Checkout','OrderPlaced'];
+
+function badge(type) {
+  if (type === 'screen_enter') return `<span class="badge badge-enter">enter</span>`;
+  if (type === 'screen_exit')  return `<span class="badge badge-exit">exit</span>`;
+  if (type.includes('login') || type.includes('signup')) return `<span class="badge badge-login">${type}</span>`;
+  return `<span class="badge badge-event">${type}</span>`;
+}
+
+function fmt(ts) {
+  try { return new Date(ts).toLocaleTimeString(); } catch { return ts; }
+}
+
+function renderStats(s) {
+  document.getElementById('kpi-total').textContent    = s.total.toLocaleString();
+  document.getElementById('kpi-sessions').textContent = s.sessions.toLocaleString();
+  document.getElementById('kpi-users').textContent    = s.users.toLocaleString();
+
+  // app filter dropdown (preserve current selection)
+  const select = document.getElementById('app-filter');
+  const current = select.value;
+  select.innerHTML = '<option value="">All apps</option>' +
+    s.apps.map(a => `<option value="${a}">${a}</option>`).join('');
+  select.value = current;
+
+  // funnel
+  const funnelMap = {};
+  for (const r of s.funnel) funnelMap[r.screen_name] = r.sessions;
+  const maxVal = Math.max(...Object.values(funnelMap), 1);
+
+  // conversion rate: sessions with a purchase event vs. all sessions
+  document.getElementById('kpi-conversion').textContent = `${(s.conversionRate || 0).toFixed(1)}%`;
+
+  const topVal = funnelMap[FUNNEL_ORDER[0]] || maxVal;
+  document.getElementById('funnel').innerHTML = FUNNEL_ORDER.map(name => {
+    const n   = funnelMap[name] || 0;
+    const pct = topVal > 0 ? Math.round(n / topVal * 100) : 0;
+    const w   = maxVal > 0 ? Math.round(n / maxVal * 100) : 0;
+    return `<div class="funnel-row">
+      <div class="funnel-label">${name}</div>
+      <div class="funnel-bar-wrap">
+        <div class="funnel-bar" style="width:${w}%">${n}</div>
+      </div>
+      <div class="funnel-pct">${pct}%</div>
+    </div>`;
+  }).join('');
+
+  // event types
+  document.getElementById('event-types').innerHTML = s.byType.map(r =>
+    `<tr><td>${badge(r.event_type)}</td><td>${r.count.toLocaleString()}</td></tr>`
+  ).join('');
+
+  // screen time
+  document.getElementById('screen-time').innerHTML = s.screenTime.map(r =>
+    `<tr><td>${r.screen_name}</td><td>${r.avg_sec}s</td><td>${r.views}</td></tr>`
+  ).join('');
+
+  // recent events (initial load)
+  const tbody = document.getElementById('feed');
+  tbody.innerHTML = '';
+  for (const e of s.recent) prependRow(e);
+}
+
+function prependRow(e) {
+  const tbody = document.getElementById('feed');
+  const tr = document.createElement('tr');
+  const props = e.properties ? JSON.stringify(typeof e.properties === 'string' ? JSON.parse(e.properties) : e.properties) : '';
+  const dur  = e.duration_ms != null ? `${(e.duration_ms/1000).toFixed(1)}s` : '';
+  const uid  = e.user_id || e.anonymous_id?.slice(0,8) + '…';
+  tr.innerHTML = `
+    <td class="ts">${fmt(e.timestamp)}</td>
+    <td class="ts">${e.app_slug || ''}</td>
+    <td>${badge(e.event_type)}</td>
+    <td>${e.screen_name || ''}</td>
+    <td>${dur}</td>
+    <td class="ts">${uid}</td>
+    <td class="props">${props}</td>
+  `;
+  tr.addEventListener('click', () => showEventDetail(e));
+  tbody.prepend(tr);
+  // keep feed at 200 rows max
+  while (tbody.children.length > 200) tbody.removeChild(tbody.lastChild);
+}
+
+// ── Event detail modal ─────────────────────────────────────────────────────
+
+function escapeHtml(str) {
+  return String(str).replace(/[&<>"']/g, c => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+  }[c]));
+}
+
+function labelize(key) {
+  return String(key).replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+}
+
+function formatValue(value) {
+  if (value === null || value === undefined || value === '') return '<span class="props-empty">—</span>';
+  if (typeof value === 'boolean') return value ? 'Yes' : 'No';
+  if (typeof value === 'object') {
+    return `<pre style="white-space:pre-wrap;font-family:inherit;font-size:12px;color:var(--text)">${escapeHtml(JSON.stringify(value, null, 2))}</pre>`;
+  }
+  return escapeHtml(String(value));
+}
+
+function showEventDetail(e) {
+  document.getElementById('modal-title').textContent = labelize(e.event_type || 'Event');
+
+  const dur = e.duration_ms != null ? `${(e.duration_ms/1000).toFixed(1)}s` : null;
+  const fields = [
+    ['Time',        new Date(e.timestamp).toLocaleString()],
+    ['App',         e.app_slug],
+    ['Type',        e.event_type],
+    ['Screen',      e.screen_name],
+    ['Duration',    dur],
+    ['User ID',     e.user_id],
+    ['Anonymous ID', e.anonymous_id],
+    ['Session ID',  e.session_id],
+    ['Platform',    e.platform],
+    ['App Version', e.app_version],
+    ['OS Version',  e.os_version],
+  ];
+
+  document.getElementById('modal-detail').innerHTML = fields
+    .filter(([, v]) => v !== null && v !== undefined && v !== '')
+    .map(([label, v]) => `<tr><td>${escapeHtml(label)}</td><td>${formatValue(v)}</td></tr>`)
+    .join('');
+
+  let props = e.properties;
+  if (typeof props === 'string') {
+    try { props = JSON.parse(props); } catch { props = null; }
+  }
+
+  const propsTable = document.getElementById('modal-props');
+  const entries = props && typeof props === 'object' ? Object.entries(props) : [];
+  if (entries.length === 0) {
+    propsTable.innerHTML = `<tr><td colspan="2"><span class="props-empty">No additional properties</span></td></tr>`;
+  } else {
+    propsTable.innerHTML = entries
+      .map(([key, v]) => `<tr><td>${escapeHtml(labelize(key))}</td><td>${formatValue(v)}</td></tr>`)
+      .join('');
+  }
+
+  document.getElementById('event-modal').classList.add('open');
+}
+
+function closeEventDetail() {
+  document.getElementById('event-modal').classList.remove('open');
+}
+
+document.getElementById('modal-close').addEventListener('click', closeEventDetail);
+document.getElementById('event-modal').addEventListener('click', (ev) => {
+  if (ev.target.id === 'event-modal') closeEventDetail();
+});
+document.addEventListener('keydown', (ev) => {
+  if (ev.key === 'Escape') closeEventDetail();
+});
+
+// initial load
+function currentApp() {
+  return document.getElementById('app-filter').value;
+}
+
+async function load() {
+  const appSlug = currentApp();
+  const r = await fetch('/api/stats' + (appSlug ? `?app_slug=${encodeURIComponent(appSlug)}` : ''));
+  const s = await r.json();
+  renderStats(s);
+}
+load();
+setInterval(load, 10000); // refresh stats every 10s
+
+// real-time feed via SSE — recreated whenever the app filter changes
+let es;
+function connectStream() {
+  if (es) es.close();
+  const appSlug = currentApp();
+  es = new EventSource('/api/stream' + (appSlug ? `?app_slug=${encodeURIComponent(appSlug)}` : ''));
+  es.onmessage = e => {
+    const event = JSON.parse(e.data);
+    prependRow(event);
+    // bump KPI counter
+    const el = document.getElementById('kpi-total');
+    el.textContent = (parseInt(el.textContent.replace(/,/g,''), 10) + 1).toLocaleString();
+  };
+}
+connectStream();
+
+document.getElementById('app-filter').addEventListener('change', () => {
+  load();
+  connectStream();
+});
+</script>
+</body>
+</html>
