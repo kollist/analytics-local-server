@@ -140,26 +140,24 @@ app.get('/api/stats', (req, res) => {
     GROUP BY screen_name ORDER BY avg_sec DESC
   `).all(...args);
 
-  const funnel = db.prepare(`
-    SELECT screen_name, COUNT(DISTINCT session_id) as sessions
-    FROM events
-    WHERE event_type = 'screen_entered' AND screen_name IN (
-      'Splash','Login','Signup','Home','Categories',
-      'ProductList','ProductDetail','Cart','Checkout'
-    )
-    ${appSlug ? 'AND app_slug = ?' : ''}
-    GROUP BY screen_name
-  `).all(...args);
-
-  const purchaseSessions = db.prepare(`
+  // Event-based ordering funnel: distinct sessions that fired each step event.
+  // Action events are more reliable than screen views (the new checkout doesn't
+  // always emit screen_entered), so we measure conversion off the events themselves.
+  const FUNNEL_STEPS = [
+    'view_item_list', 'view_item', 'add_to_cart',
+    'begin_checkout', 'place_order_tapped', 'purchase',
+  ];
+  const stepStmt = db.prepare(`
     SELECT COUNT(DISTINCT session_id) as n FROM events
-    WHERE event_type = 'purchase'
+    WHERE event_type = ?
     ${appSlug ? 'AND app_slug = ?' : ''}
-  `).get(...args).n;
+  `);
+  const funnel = FUNNEL_STEPS.map(step => ({
+    step,
+    sessions: stepStmt.get(step, ...args).n,
+  }));
 
-  // "OrderPlaced" funnel step is driven by the purchase event, not a screen_enter
-  // — the OrderPlaced screen doesn't always fire reliably.
-  funnel.push({ screen_name: 'OrderPlaced', sessions: purchaseSessions });
+  const purchaseSessions = funnel[funnel.length - 1].sessions;
 
   const conversionRate = sessions > 0 ? (purchaseSessions / sessions) * 100 : 0;
 

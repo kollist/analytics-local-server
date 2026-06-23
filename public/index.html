@@ -197,7 +197,16 @@
 </div>
 
 <script>
-const FUNNEL_ORDER = ['Splash','Login','Signup','Home','Categories','ProductList','ProductDetail','Cart','Checkout','OrderPlaced'];
+// Event-based ordering funnel: each step is an action event (see server.js FUNNEL_STEPS).
+const FUNNEL_ORDER  = ['view_item_list','view_item','add_to_cart','begin_checkout','place_order_tapped','purchase'];
+const FUNNEL_LABELS = {
+  view_item_list:     'Browse menu',
+  view_item:          'View item',
+  add_to_cart:        'Add to cart',
+  begin_checkout:     'Begin checkout',
+  place_order_tapped: 'Place order',
+  purchase:           'Purchase',
+};
 
 function badge(type) {
   if (type === 'screen_entered') return `<span class="badge badge-enter">enter</span>`;
@@ -222,9 +231,9 @@ function renderStats(s) {
     s.apps.map(a => `<option value="${a}">${a}</option>`).join('');
   select.value = current;
 
-  // funnel
+  // funnel (event-based: keyed by step event name)
   const funnelMap = {};
-  for (const r of s.funnel) funnelMap[r.screen_name] = r.sessions;
+  for (const r of s.funnel) funnelMap[r.step] = r.sessions;
   const maxVal = Math.max(...Object.values(funnelMap), 1);
 
   // conversion rate: sessions with a purchase event vs. all sessions
@@ -236,7 +245,7 @@ function renderStats(s) {
     const pct = topVal > 0 ? Math.round(n / topVal * 100) : 0;
     const w   = maxVal > 0 ? Math.round(n / maxVal * 100) : 0;
     return `<div class="funnel-row">
-      <div class="funnel-label">${name}</div>
+      <div class="funnel-label">${FUNNEL_LABELS[name] || name}</div>
       <div class="funnel-bar-wrap">
         <div class="funnel-bar" style="width:${w}%">${n}</div>
       </div>
