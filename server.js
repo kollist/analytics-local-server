@@ -127,7 +127,7 @@ app.get('/api/stats', (req, res) => {
   const byType = db.prepare(`
     SELECT event_type, COUNT(*) as count
     FROM events ${where}
-    GROUP BY event_type ORDER BY count DESC LIMIT 20
+    GROUP BY event_type ORDER BY count DESC
   `).all(...args);
 
   const screenTime = db.prepare(`
