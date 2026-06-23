@@ -135,7 +135,7 @@ app.get('/api/stats', (req, res) => {
            ROUND(AVG(duration_ms)/1000.0, 1) as avg_sec,
            COUNT(*) as views
     FROM events
-    WHERE event_type = 'screen_exit' AND screen_name IS NOT NULL AND duration_ms IS NOT NULL
+    WHERE event_type = 'screen_exited' AND screen_name IS NOT NULL AND duration_ms IS NOT NULL
     ${appSlug ? 'AND app_slug = ?' : ''}
     GROUP BY screen_name ORDER BY avg_sec DESC
   `).all(...args);
@@ -143,7 +143,7 @@ app.get('/api/stats', (req, res) => {
   const funnel = db.prepare(`
     SELECT screen_name, COUNT(DISTINCT session_id) as sessions
     FROM events
-    WHERE event_type = 'screen_enter' AND screen_name IN (
+    WHERE event_type = 'screen_entered' AND screen_name IN (
       'Splash','Login','Signup','Home','Categories',
       'ProductList','ProductDetail','Cart','Checkout'
     )

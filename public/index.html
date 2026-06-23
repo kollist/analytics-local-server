@@ -200,8 +200,8 @@
 const FUNNEL_ORDER = ['Splash','Login','Signup','Home','Categories','ProductList','ProductDetail','Cart','Checkout','OrderPlaced'];
 
 function badge(type) {
-  if (type === 'screen_enter') return `<span class="badge badge-enter">enter</span>`;
-  if (type === 'screen_exit')  return `<span class="badge badge-exit">exit</span>`;
+  if (type === 'screen_entered') return `<span class="badge badge-enter">enter</span>`;
+  if (type === 'screen_exited')  return `<span class="badge badge-exit">exit</span>`;
   if (type.includes('login') || type.includes('signup')) return `<span class="badge badge-login">${type}</span>`;
   return `<span class="badge badge-event">${type}</span>`;
 }
