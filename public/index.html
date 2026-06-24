@@ -161,6 +161,18 @@
     </table>
   </div>
   <div class="card">
+    <h2>Errors</h2>
+    <br/>
+    <table>
+      <thead><tr><th>Type</th><th>Count</th></tr></thead>
+      <tbody id="error-types"></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Drop-off guide -->
+<div class="full-col">
+  <div class="card">
     <!-- placeholder for future chart -->
     <h2>Drop-off Guide</h2>
     <br/>
@@ -224,21 +236,25 @@ const EVENT_GROUPS = [
                      'coupon_selected_from_list','loyalty_points_applied','loyalty_suggestion_selected','loyalty_cleared','tip_selected',
                      'special_instructions_entered','contact_info_edited','phone_verification_sent','phone_verified',
                      'discount_item_selected','place_order_tapped']],
-  ['Order outcome', ['order_placed','order_place_failed','purchase','checkout_abandoned','track_order','view_receipt','order_again']],
+  ['Order outcome', ['order_placed','purchase','checkout_abandoned','track_order','view_receipt','order_again']],
   ['Engagement',    ['home_refreshed','story_clicked','featured_item_clicked','article_clicked','event_clicked','event_buy_clicked',
                      'reward_clicked','ticket_qr_viewed','location_selected','location_directions','view_notification']],
-  ['Auth',          ['sign_up','login_attempt','login_success','login_failed']],
-  ['System',        ['session_start','session_end','screen_entered','screen_exited','app_error']],
+  ['Auth',          ['sign_up','login_attempt','login_success']],
+  ['System',        ['session_start','session_end','screen_entered','screen_exited']],
 ];
 const GROUP_OF = {};
 for (const [g, evs] of EVENT_GROUPS) for (const e of evs) GROUP_OF[e] = g;
 const GROUP_ORDER = EVENT_GROUPS.map(g => g[0]).concat('Other');
+
+// Error / failure events get their own panel instead of mixing into the list above.
+const ERROR_EVENTS = new Set(['app_error', 'order_place_failed', 'login_failed']);
 const openGroups = new Set(); // persisted expand/collapse state across refreshes
 
 function renderEventTypes(byType) {
   const groups = {};
   for (const name of GROUP_ORDER) groups[name] = { total: 0, rows: [] };
   for (const r of byType) {
+    if (ERROR_EVENTS.has(r.event_type)) continue; // shown in the Errors panel
     const g = GROUP_OF[r.event_type] || 'Other';
     groups[g].total += r.count;
     groups[g].rows.push(r);
@@ -260,6 +276,20 @@ function renderEventTypes(byType) {
     }
   }
   document.getElementById('event-types').innerHTML = html;
+}
+
+function renderErrors(byType) {
+  const rows = byType.filter(r => ERROR_EVENTS.has(r.event_type))
+                     .sort((a, b) => b.count - a.count);
+  const el = document.getElementById('error-types');
+  if (rows.length === 0) {
+    el.innerHTML = `<tr><td colspan="2" style="color:var(--muted)">No errors recorded 🎉</td></tr>`;
+    return;
+  }
+  el.innerHTML = rows.map(r =>
+    `<tr><td><span class="badge badge-exit">${r.event_type}</span></td>
+         <td style="color:var(--red);font-weight:700">${r.count.toLocaleString()}</td></tr>`
+  ).join('');
 }
 
 function toggleGroup(name) {
@@ -319,6 +349,9 @@ function renderStats(s) {
 
   // event types (grouped into collapsible categories)
   renderEventTypes(s.byType);
+
+  // errors (separate panel)
+  renderErrors(s.byType);
 
   // screen time
   document.getElementById('screen-time').innerHTML = s.screenTime.map(r =>
