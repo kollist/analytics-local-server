@@ -3,10 +3,19 @@
 const express = require('express');
 const Database = require('better-sqlite3');
 const path = require('path');
+const fs = require('fs');
 
 // ── Database setup ────────────────────────────────────────────────────────────
-
-const db = new Database(path.join(__dirname, 'analytics.sqlite'));
+// Auto-deploy on the host wipes this directory's untracked files on every
+// push (it's a git working tree, not just a plain deploy target), which
+// takes analytics.sqlite with it. If a sibling `analytics-data/` directory
+// exists next to this repo (outside the git working tree, so deploys never
+// touch it), the database lives there instead — see the deploy README for
+// how that directory is set up on the host. Falls back to __dirname so local
+// dev / a fresh clone still works with zero setup.
+const persistentDir = path.join(__dirname, '..', 'analytics-data');
+const dbDir = fs.existsSync(persistentDir) ? persistentDir : __dirname;
+const db = new Database(path.join(dbDir, 'analytics.sqlite'));
 
 // Batch-payload schema (app_slug + platform, device_model now optional).
 db.exec(`
