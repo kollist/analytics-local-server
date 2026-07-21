@@ -21,19 +21,25 @@
     padding: 16px 24px; display: flex; align-items: center; gap: 12px;
   }
   header h1 { font-size: 18px; font-weight: 700; }
+  select {
+    background: var(--surface); color: var(--text); border: 1px solid var(--border);
+    border-radius: 6px; padding: 4px 8px; font-family: inherit; font-size: 13px;
+  }
   .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--green);
          animation: pulse 2s infinite; margin-left: auto; }
   @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.3} }
   .live-label { font-size: 12px; color: var(--green); }
 
-  .grid { display: grid; grid-template-columns: repeat(4,1fr); gap: 16px; padding: 24px 24px 0; }
+  .grid { display: grid; grid-template-columns: repeat(6,1fr); gap: 16px; padding: 24px 24px 0; }
 
   .card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 20px; }
   .card h2 { font-size: 11px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); margin-bottom: 8px; }
-  .card .big { font-size: 36px; font-weight: 700; }
+  .card .big { font-size: 32px; font-weight: 700; }
+  .card .sub { font-size: 11px; color: var(--muted); margin-top: 4px; }
 
-  .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; padding: 16px 24px 0; }
-  .full-col { padding: 16px 24px 24px; }
+  .two-col   { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; padding: 16px 24px 0; }
+  .three-col { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; padding: 16px 24px 0; }
+  .full-col  { padding: 16px 24px 24px; }
 
   table { width: 100%; border-collapse: collapse; font-size: 13px; }
   th { text-align: left; color: var(--muted); font-weight: 600; font-size: 11px;
@@ -53,14 +59,20 @@
   .badge-login  { background: rgba(245,158,11,.15); color: var(--yellow); }
   .badge-guest  { background: rgba(100,116,139,.15); color: var(--muted); }
   .badge-user   { background: rgba(34,197,94,.15);  color: var(--green); }
+  .badge-error  { background: rgba(239,68,68,.15);   color: var(--red); }
 
   /* funnel */
-  .funnel { display: flex; flex-direction: column; gap: 8px; }
+  .funnel { display: flex; flex-direction: column; gap: 10px; }
   .funnel-row { display: flex; align-items: center; gap: 10px; }
   .funnel-label { width: 120px; font-size: 12px; color: var(--muted); flex-shrink: 0; text-align: right; }
   .funnel-bar-wrap { flex: 1; background: var(--border); border-radius: 4px; height: 22px; overflow: hidden; }
   .funnel-bar { height: 100%; background: var(--accent); border-radius: 4px; transition: width .6s ease; display: flex; align-items: center; padding-left: 8px; font-size: 12px; font-weight: 600; min-width: 30px; }
-  .funnel-pct { width: 46px; text-align: right; font-size: 12px; color: var(--muted); }
+  .funnel-pct { width: 50px; text-align: right; font-size: 12px; color: var(--muted); }
+  .funnel-prev { width: 92px; text-align: right; font-size: 11px; color: var(--muted); flex-shrink: 0; }
+  .funnel-prev b { color: var(--text); font-weight: 600; }
+  .funnel-head { display: flex; gap: 10px; margin-bottom: 2px; }
+  .funnel-head .funnel-label, .funnel-head .funnel-pct, .funnel-head .funnel-prev { font-size: 10px; text-transform: uppercase; letter-spacing: .06em; }
+  .funnel-head .funnel-bar-wrap { visibility: hidden; height: 0; }
 
   /* live feed */
   #feed { max-height: 380px; overflow-y: auto; }
@@ -73,7 +85,7 @@
   ::-webkit-scrollbar-track { background: transparent; }
   ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
 
-  #feed tr { cursor: pointer; }
+  #feed tr, #errors tr.err-row { cursor: pointer; }
 
   /* event detail modal */
   .modal-overlay {
@@ -109,6 +121,25 @@
   .grp-caret { display: inline-block; width: 12px; color: var(--muted); transition: transform .15s ease; font-size: 10px; }
   .grp-header.open .grp-caret { transform: rotate(90deg); }
   .grp-count { color: var(--muted); font-weight: 600; }
+
+  /* trend charts */
+  .chart-wrap svg { display: block; }
+  .chart-total { font-size: 20px; font-weight: 700; margin-bottom: 2px; }
+  .chart-total .unit { font-size: 12px; color: var(--muted); font-weight: 600; margin-left: 4px; }
+
+  /* drop-off guide */
+  .insight-list { display: flex; flex-direction: column; gap: 14px; }
+  .insight { display: flex; gap: 10px; align-items: flex-start; }
+  .insight .ic { font-size: 15px; line-height: 1.4; flex-shrink: 0; }
+  .insight .body b { color: var(--text); }
+  .insight .body { color: var(--muted); font-size: 13px; line-height: 1.6; }
+
+  .err-summary-row { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 14px; }
+  .err-pill {
+    display: flex; align-items: center; gap: 6px; background: rgba(239,68,68,.08);
+    border: 1px solid rgba(239,68,68,.25); border-radius: 8px; padding: 6px 10px; font-size: 12px;
+  }
+  .err-pill b { color: var(--red); font-size: 13px; }
 </style>
 </head>
 <body>
@@ -118,8 +149,14 @@
     <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
   </svg>
   <h1>Analytics · Local Dev</h1>
-  <select id="app-filter" style="margin-left:16px; background:var(--surface); color:var(--text); border:1px solid var(--border); border-radius:6px; padding:4px 8px;">
+  <select id="app-filter">
     <option value="">All apps</option>
+  </select>
+  <select id="days-filter">
+    <option value="7">Last 7 days</option>
+    <option value="14" selected>Last 14 days</option>
+    <option value="30">Last 30 days</option>
+    <option value="90">Last 90 days</option>
   </select>
   <div class="live-label">LIVE</div>
   <div class="dot"></div>
@@ -131,6 +168,24 @@
   <div class="card"><h2>Sessions</h2><div class="big" id="kpi-sessions">—</div></div>
   <div class="card"><h2>Unique Users</h2><div class="big" id="kpi-users">—</div></div>
   <div class="card"><h2>Conversion Rate</h2><div class="big" id="kpi-conversion">—</div></div>
+  <div class="card"><h2>Revenue</h2><div class="big" id="kpi-revenue">—</div></div>
+  <div class="card"><h2>Avg Order Value</h2><div class="big" id="kpi-aov">—</div></div>
+</div>
+
+<!-- Trend charts -->
+<div class="three-col">
+  <div class="card">
+    <h2>Sessions / day</h2>
+    <div class="chart-wrap" id="chart-sessions"></div>
+  </div>
+  <div class="card">
+    <h2>Conversion rate / day</h2>
+    <div class="chart-wrap" id="chart-conversion"></div>
+  </div>
+  <div class="card">
+    <h2>Revenue / day</h2>
+    <div class="chart-wrap" id="chart-revenue"></div>
+  </div>
 </div>
 
 <!-- Funnel + event types -->
@@ -138,6 +193,12 @@
   <div class="card">
     <h2>Ordering Funnel</h2>
     <br/>
+    <div class="funnel-head funnel-row">
+      <div class="funnel-label">Step</div>
+      <div class="funnel-bar-wrap"></div>
+      <div class="funnel-pct">Of top</div>
+      <div class="funnel-prev">Of previous</div>
+    </div>
     <div class="funnel" id="funnel"></div>
   </div>
   <div class="card">
@@ -163,9 +224,10 @@
   <div class="card">
     <h2>Errors</h2>
     <br/>
+    <div class="err-summary-row" id="error-summary"></div>
     <table>
-      <thead><tr><th>Type</th><th>Count</th></tr></thead>
-      <tbody id="error-types"></tbody>
+      <thead><tr><th>Time</th><th>App</th><th>Type</th><th>Detail</th></tr></thead>
+      <tbody id="errors"></tbody>
     </table>
   </div>
 </div>
@@ -173,15 +235,9 @@
 <!-- Drop-off guide -->
 <div class="full-col">
   <div class="card">
-    <!-- placeholder for future chart -->
     <h2>Drop-off Guide</h2>
     <br/>
-    <p style="color:var(--muted);font-size:13px;line-height:1.7">
-      Compare funnel stages to find where users stop.<br><br>
-      <b style="color:var(--text)">Low Cart → Checkout</b> = pricing or UX friction on the cart screen.<br><br>
-      <b style="color:var(--text)">High ProductDetail time</b> = users are confused about modifiers.<br><br>
-      <b style="color:var(--text)">Many Login exits</b> = sign-in friction, consider guest checkout.
-    </p>
+    <div class="insight-list" id="insights"></div>
   </div>
 </div>
 
@@ -278,20 +334,6 @@ function renderEventTypes(byType) {
   document.getElementById('event-types').innerHTML = html;
 }
 
-function renderErrors(byType) {
-  const rows = byType.filter(r => ERROR_EVENTS.has(r.event_type))
-                     .sort((a, b) => b.count - a.count);
-  const el = document.getElementById('error-types');
-  if (rows.length === 0) {
-    el.innerHTML = `<tr><td colspan="2" style="color:var(--muted)">No errors recorded 🎉</td></tr>`;
-    return;
-  }
-  el.innerHTML = rows.map(r =>
-    `<tr><td><span class="badge badge-exit">${r.event_type}</span></td>
-         <td style="color:var(--red);font-weight:700">${r.count.toLocaleString()}</td></tr>`
-  ).join('');
-}
-
 function toggleGroup(name) {
   const isOpen = openGroups.has(name);
   if (isOpen) openGroups.delete(name); else openGroups.add(name);
@@ -313,10 +355,202 @@ function fmt(ts) {
   try { return new Date(ts).toLocaleTimeString(); } catch { return ts; }
 }
 
+function fmtMoney(n) {
+  return '$' + (n || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+function fmtDay(day) {
+  // "2026-07-21" -> "Jul 21"
+  const d = new Date(day + 'T00:00:00Z');
+  return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', timeZone: 'UTC' });
+}
+
+// ── Trend charts (hand-rolled SVG — no chart library, matches the dashboard's
+// own tokens: one hue per chart, thin marks, native <title> tooltips) ──────────
+
+function escapeHtml(str) {
+  return String(str).replace(/[&<>"']/g, c => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+  }[c]));
+}
+
+function barChart(data, { color, valueFmt }) {
+  const width = 400, height = 130;
+  const pad = { top: 10, right: 6, bottom: 18, left: 6 };
+  const innerW = width - pad.left - pad.right;
+  const innerH = height - pad.top - pad.bottom;
+  const max = Math.max(...data.map(d => d.value), 1);
+  const barW = innerW / data.length;
+  const gap = Math.min(6, barW * 0.3);
+
+  let bars = '';
+  data.forEach((d, i) => {
+    const h = max > 0 ? (d.value / max) * innerH : 0;
+    const x = pad.left + i * barW + gap / 2;
+    const w = Math.max(barW - gap, 1);
+    const y = pad.top + (innerH - h);
+    bars += `<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${w.toFixed(1)}" height="${Math.max(h, 1).toFixed(1)}" rx="2.5" fill="${color}"><title>${escapeHtml(fmtDay(d.day))}: ${escapeHtml(valueFmt(d.value))}</title></rect>`;
+  });
+  const baseline = `<line x1="${pad.left}" y1="${pad.top + innerH}" x2="${width - pad.right}" y2="${pad.top + innerH}" stroke="var(--border)" stroke-width="1"/>`;
+  const labels = data.length > 0 ? `
+    <text x="${pad.left}" y="${height - 4}" font-size="10" fill="var(--muted)">${escapeHtml(fmtDay(data[0].day))}</text>
+    <text x="${width - pad.right}" y="${height - 4}" font-size="10" fill="var(--muted)" text-anchor="end">${escapeHtml(fmtDay(data[data.length - 1].day))}</text>` : '';
+  return `<svg viewBox="0 0 ${width} ${height}" width="100%" height="${height}" preserveAspectRatio="none">${baseline}${bars}${labels}</svg>`;
+}
+
+function lineChart(data, { color, max, valueFmt }) {
+  const width = 400, height = 130;
+  const pad = { top: 14, right: 6, bottom: 18, left: 6 };
+  const innerW = width - pad.left - pad.right;
+  const innerH = height - pad.top - pad.bottom;
+  const scaleMax = max ?? Math.max(...data.map(d => d.value), 1);
+  const n = data.length;
+  const stepX = n > 1 ? innerW / (n - 1) : 0;
+
+  const points = data.map((d, i) => ({
+    x: pad.left + i * stepX,
+    y: pad.top + innerH - (scaleMax > 0 ? Math.min(d.value, scaleMax) / scaleMax : 0) * innerH,
+    d,
+  }));
+  const path = points.map((p, i) => `${i === 0 ? 'M' : 'L'}${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ');
+  const dots = points.map(p =>
+    `<circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="3" fill="${color}"><title>${escapeHtml(fmtDay(p.d.day))}: ${escapeHtml(valueFmt(p.d.value))}</title></circle>`
+  ).join('');
+  const baseline = `<line x1="${pad.left}" y1="${pad.top + innerH}" x2="${width - pad.right}" y2="${pad.top + innerH}" stroke="var(--border)" stroke-width="1"/>`;
+  const labels = data.length > 0 ? `
+    <text x="${pad.left}" y="${height - 4}" font-size="10" fill="var(--muted)">${escapeHtml(fmtDay(data[0].day))}</text>
+    <text x="${width - pad.right}" y="${height - 4}" font-size="10" fill="var(--muted)" text-anchor="end">${escapeHtml(fmtDay(data[data.length - 1].day))}</text>` : '';
+  return `<svg viewBox="0 0 ${width} ${height}" width="100%" height="${height}" preserveAspectRatio="none">${baseline}<path d="${path}" fill="none" stroke="${color}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>${dots}${labels}</svg>`;
+}
+
+function renderTrends(daily) {
+  const totalSessions = daily.reduce((s, d) => s + d.sessions, 0);
+  const totalRevenue  = daily.reduce((s, d) => s + d.revenue, 0);
+  const avgConversion = daily.length ? daily.reduce((s, d) => s + d.conversionRate, 0) / daily.length : 0;
+
+  document.getElementById('chart-sessions').innerHTML =
+    `<div class="chart-total">${totalSessions.toLocaleString()}<span class="unit">sessions</span></div>` +
+    barChart(daily.map(d => ({ day: d.day, value: d.sessions })), { color: 'var(--accent)', valueFmt: v => `${v} sessions` });
+
+  document.getElementById('chart-conversion').innerHTML =
+    `<div class="chart-total">${avgConversion.toFixed(1)}%<span class="unit">avg</span></div>` +
+    lineChart(daily.map(d => ({ day: d.day, value: d.conversionRate })), { color: 'var(--green)', max: 100, valueFmt: v => `${v.toFixed(1)}%` });
+
+  document.getElementById('chart-revenue').innerHTML =
+    `<div class="chart-total">${fmtMoney(totalRevenue)}<span class="unit">total</span></div>` +
+    barChart(daily.map(d => ({ day: d.day, value: d.revenue })), { color: 'var(--accent)', valueFmt: v => fmtMoney(v) });
+}
+
+// ── Funnel: both "% of top" (overall reach) and "% of previous step" (the
+// actual conversion rate of that specific transition) ─────────────────────────
+
+function renderFunnel(funnel) {
+  const byStep = {};
+  for (const r of funnel) byStep[r.step] = r;
+  const maxVal = Math.max(...funnel.map(r => r.sessions), 1);
+
+  document.getElementById('funnel').innerHTML = FUNNEL_ORDER.map(name => {
+    const r = byStep[name] || { sessions: 0, pctOfFirst: 0, pctOfPrevious: 0 };
+    const w = maxVal > 0 ? Math.round(r.sessions / maxVal * 100) : 0;
+    return `<div class="funnel-row">
+      <div class="funnel-label">${FUNNEL_LABELS[name] || name}</div>
+      <div class="funnel-bar-wrap">
+        <div class="funnel-bar" style="width:${w}%">${r.sessions}</div>
+      </div>
+      <div class="funnel-pct">${r.pctOfFirst.toFixed(0)}%</div>
+      <div class="funnel-prev"><b>${r.pctOfPrevious.toFixed(0)}%</b> continued</div>
+    </div>`;
+  }).join('');
+}
+
+// ── Drop-off Guide: computed from the actual data instead of static copy ──────
+
+function renderInsights(funnel, screenTime, errors) {
+  const items = [];
+
+  // Biggest relative drop between consecutive funnel steps.
+  const steps = funnel.filter(r => r.sessions > 0 || r.step === FUNNEL_ORDER[0]);
+  let worst = null;
+  for (let i = 1; i < funnel.length; i++) {
+    const r = funnel[i];
+    const prevLabel = FUNNEL_LABELS[funnel[i - 1].step];
+    if (funnel[i - 1].sessions === 0) continue;
+    if (!worst || r.pctOfPrevious < worst.r.pctOfPrevious) worst = { r, prevLabel, i };
+  }
+  if (worst) {
+    const label = FUNNEL_LABELS[worst.r.step];
+    items.push({
+      ic: '📉',
+      body: `Biggest drop-off: <b>${worst.prevLabel} → ${label}</b> — only <b>${worst.r.pctOfPrevious.toFixed(0)}%</b> of sessions that reached "${worst.prevLabel}" continued to "${label}". That's the single transition worth investigating first.`,
+    });
+  }
+
+  // Screen with the highest average time — could be genuine interest or friction.
+  if (screenTime.length > 0) {
+    const top = screenTime[0]; // already sorted by avg_sec desc from the server
+    items.push({
+      ic: '⏱️',
+      body: `Longest average time is on <b>${top.screen_name}</b> (${top.avg_sec}s, ${top.views} views). If that's a decision screen (menu item, checkout), a high time there often means friction or confusion rather than engagement.`,
+    });
+  }
+
+  // Most frequent error in the current window.
+  if (errors.length > 0) {
+    const counts = {};
+    for (const e of errors) counts[e.summary] = (counts[e.summary] || 0) + 1;
+    const [topSummary, topCount] = Object.entries(counts).sort((a, b) => b[1] - a[1])[0];
+    items.push({
+      ic: '🛑',
+      body: `${errors.length} error${errors.length === 1 ? '' : 's'} recorded recently. Most common: <b>${escapeHtml(topSummary)}</b> (${topCount}×). See the Errors panel for the full list.`,
+    });
+  } else {
+    items.push({ ic: '✅', body: `No errors recorded in the current window.` });
+  }
+
+  document.getElementById('insights').innerHTML = items.map(it =>
+    `<div class="insight"><div class="ic">${it.ic}</div><div class="body">${it.body}</div></div>`
+  ).join('');
+}
+
+// ── Errors panel: an actual readable list, not just a bare count ──────────────
+
+function renderErrors(errors) {
+  const summaryEl = document.getElementById('error-summary');
+  const counts = {};
+  for (const e of errors) counts[e.event_type] = (counts[e.event_type] || 0) + 1;
+  const labels = { app_error: 'App errors', order_place_failed: 'Order failures', login_failed: 'Login failures' };
+  summaryEl.innerHTML = Object.keys(labels).map(type =>
+    counts[type] ? `<div class="err-pill"><b>${counts[type]}</b> ${labels[type]}</div>` : ''
+  ).join('') || `<div style="color:var(--muted);font-size:12px">No errors recorded 🎉</div>`;
+
+  const tbody = document.getElementById('errors');
+  if (errors.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="4" style="color:var(--muted)">No errors recorded 🎉</td></tr>`;
+    return;
+  }
+  tbody.innerHTML = errors.slice(0, 30).map(e => `
+    <tr class="err-row" data-error-id="${e.id}">
+      <td class="ts">${fmt(e.timestamp)}</td>
+      <td class="ts">${e.app_slug || ''}</td>
+      <td><span class="badge badge-error">${e.event_type}</span></td>
+      <td class="props" style="max-width:420px">${escapeHtml(e.summary)}</td>
+    </tr>
+  `).join('');
+  tbody.querySelectorAll('tr.err-row').forEach(tr => {
+    tr.addEventListener('click', () => {
+      const e = errors.find(x => String(x.id) === tr.dataset.errorId);
+      if (e) showEventDetail({ ...e, properties: e.properties, anonymous_id: '', session_id: '', screen_name: null, duration_ms: null });
+    });
+  });
+}
+
 function renderStats(s) {
-  document.getElementById('kpi-total').textContent    = s.total.toLocaleString();
-  document.getElementById('kpi-sessions').textContent = s.sessions.toLocaleString();
-  document.getElementById('kpi-users').textContent    = s.users.toLocaleString();
+  document.getElementById('kpi-total').textContent      = s.total.toLocaleString();
+  document.getElementById('kpi-sessions').textContent   = s.sessions.toLocaleString();
+  document.getElementById('kpi-users').textContent      = s.users.toLocaleString();
+  document.getElementById('kpi-conversion').textContent = `${(s.conversionRate || 0).toFixed(1)}%`;
+  document.getElementById('kpi-revenue').textContent    = fmtMoney(s.revenue);
+  document.getElementById('kpi-aov').textContent        = fmtMoney(s.aov);
 
   // app filter dropdown (preserve current selection)
   const select = document.getElementById('app-filter');
@@ -325,33 +559,11 @@ function renderStats(s) {
     s.apps.map(a => `<option value="${a}">${a}</option>`).join('');
   select.value = current;
 
-  // funnel (event-based: keyed by step event name)
-  const funnelMap = {};
-  for (const r of s.funnel) funnelMap[r.step] = r.sessions;
-  const maxVal = Math.max(...Object.values(funnelMap), 1);
-
-  // conversion rate: sessions with a purchase event vs. all sessions
-  document.getElementById('kpi-conversion').textContent = `${(s.conversionRate || 0).toFixed(1)}%`;
-
-  const topVal = funnelMap[FUNNEL_ORDER[0]] || maxVal;
-  document.getElementById('funnel').innerHTML = FUNNEL_ORDER.map(name => {
-    const n   = funnelMap[name] || 0;
-    const pct = topVal > 0 ? Math.round(n / topVal * 100) : 0;
-    const w   = maxVal > 0 ? Math.round(n / maxVal * 100) : 0;
-    return `<div class="funnel-row">
-      <div class="funnel-label">${FUNNEL_LABELS[name] || name}</div>
-      <div class="funnel-bar-wrap">
-        <div class="funnel-bar" style="width:${w}%">${n}</div>
-      </div>
-      <div class="funnel-pct">${pct}%</div>
-    </div>`;
-  }).join('');
-
-  // event types (grouped into collapsible categories)
+  renderTrends(s.daily);
+  renderFunnel(s.funnel);
   renderEventTypes(s.byType);
-
-  // errors (separate panel)
-  renderErrors(s.byType);
+  renderErrors(s.errors);
+  renderInsights(s.funnel, s.screenTime, s.errors);
 
   // screen time
   document.getElementById('screen-time').innerHTML = s.screenTime.map(r =>
@@ -389,12 +601,6 @@ function prependRow(e) {
 
 // ── Event detail modal ─────────────────────────────────────────────────────
 
-function escapeHtml(str) {
-  return String(str).replace(/[&<>"']/g, c => ({
-    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
-  }[c]));
-}
-
 function labelize(key) {
   return String(key).replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
 }
@@ -419,7 +625,7 @@ function showEventDetail(e) {
     ['Type',        e.event_type],
     ['Screen',      e.screen_name],
     ['Duration',    dur],
-    ['User Type',   { raw: e.user_id ? '<span class="badge badge-user">User</span>' : '<span class="badge badge-guest">Guest</span>' }],
+    ['User Type',   e.user_id !== undefined ? { raw: e.user_id ? '<span class="badge badge-user">User</span>' : '<span class="badge badge-guest">Guest</span>' } : null],
     ['User ID',     e.user_id],
     ['Anonymous ID', e.anonymous_id],
     ['Session ID',  e.session_id],
@@ -467,10 +673,16 @@ document.addEventListener('keydown', (ev) => {
 function currentApp() {
   return document.getElementById('app-filter').value;
 }
+function currentDays() {
+  return document.getElementById('days-filter').value;
+}
 
 async function load() {
   const appSlug = currentApp();
-  const r = await fetch('/api/stats' + (appSlug ? `?app_slug=${encodeURIComponent(appSlug)}` : ''));
+  const params = new URLSearchParams();
+  if (appSlug) params.set('app_slug', appSlug);
+  params.set('days', currentDays());
+  const r = await fetch('/api/stats?' + params.toString());
   const s = await r.json();
   renderStats(s);
 }
@@ -497,6 +709,7 @@ document.getElementById('app-filter').addEventListener('change', () => {
   load();
   connectStream();
 });
+document.getElementById('days-filter').addEventListener('change', load);
 </script>
 </body>
 </html>

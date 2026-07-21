@@ -55,6 +55,39 @@ function broadcast(event) {
   }
 }
 
+// ── Shared parsing helpers ────────────────────────────────────────────────────
+
+function parseProps(raw) {
+  if (!raw) return {};
+  try { return JSON.parse(raw); } catch { return {}; }
+}
+
+// One human-readable line per error event, built from the properties each call
+// site actually sends (see AnalyticsTracker.swift / AppDelegate.swift / ATCNetworkingManager.swift).
+const ERROR_EVENT_TYPES = ['app_error', 'order_place_failed', 'login_failed'];
+
+function summarizeError(eventType, props) {
+  if (eventType === 'app_error') {
+    if (props.type === 'crash') {
+      const reason = String(props.reason || '').slice(0, 160);
+      return `Crash — ${props.name || 'Unknown'}${reason ? ': ' + reason : ''}`;
+    }
+    if (props.type === 'network') {
+      const where = [props.method, props.endpoint].filter(Boolean).join(' ');
+      const extra = props.message ? ` — ${props.message}` : (props.code ? ` — code ${props.code}` : '');
+      return `Network — ${where}${extra}`;
+    }
+    return 'App error';
+  }
+  if (eventType === 'order_place_failed') {
+    return `Order failed — [${props.code ?? '?'}] ${props.message || ''}`.trim();
+  }
+  if (eventType === 'login_failed') {
+    return `Login failed — code ${props.code ?? '?'} (${props.from_backend ? 'server' : 'client'})`;
+  }
+  return eventType;
+}
+
 // ── Express ───────────────────────────────────────────────────────────────────
 
 const app = express();
@@ -119,6 +152,7 @@ app.get('/api/stats', (req, res) => {
   const appSlug = req.query.app_slug || null;
   const where   = appSlug ? 'WHERE app_slug = ?' : '';
   const args    = appSlug ? [appSlug] : [];
+  const days    = Math.min(Math.max(parseInt(req.query.days, 10) || 14, 1), 90);
 
   const total    = db.prepare(`SELECT COUNT(*) as n FROM events ${where}`).get(...args).n;
   const sessions = db.prepare(`SELECT COUNT(DISTINCT session_id) as n FROM events ${where}`).get(...args).n;
@@ -152,14 +186,94 @@ app.get('/api/stats', (req, res) => {
     WHERE event_type = ?
     ${appSlug ? 'AND app_slug = ?' : ''}
   `);
-  const funnel = FUNNEL_STEPS.map(step => ({
-    step,
-    sessions: stepStmt.get(step, ...args).n,
-  }));
+  const funnel = FUNNEL_STEPS.map((step, i) => {
+    const stepSessions = stepStmt.get(step, ...args).n;
+    return { step, sessions: stepSessions };
+  }).map((row, i, arr) => {
+    // % of the very first step (overall reach) and % of the previous step (the
+    // actual conversion of that specific transition) — the funnel widget needs both.
+    const first = arr[0].sessions;
+    const prev  = i > 0 ? arr[i - 1].sessions : row.sessions;
+    return {
+      ...row,
+      pctOfFirst:    first > 0 ? (row.sessions / first) * 100 : 0,
+      pctOfPrevious: i > 0 ? (prev > 0 ? (row.sessions / prev) * 100 : 0) : 100,
+    };
+  });
 
   const purchaseSessions = funnel[funnel.length - 1].sessions;
-
   const conversionRate = sessions > 0 ? (purchaseSessions / sessions) * 100 : 0;
+
+  // Revenue / AOV — `value` lives inside the purchase event's JSON properties
+  // blob (see AnalyticsTracker "purchase" call sites), so it's summed in JS
+  // rather than in SQL.
+  const purchaseRows = db.prepare(`
+    SELECT properties FROM events
+    WHERE event_type = 'purchase' ${appSlug ? 'AND app_slug = ?' : ''}
+  `).all(...args);
+  let revenue = 0;
+  for (const r of purchaseRows) {
+    const v = Number(parseProps(r.properties).value);
+    if (!Number.isNaN(v)) revenue += v;
+  }
+  const aov = purchaseRows.length > 0 ? revenue / purchaseRows.length : 0;
+
+  // Daily time series for the last `days` days (UTC-bucketed, matching the
+  // ISO timestamps written at ingest time). Missing days are filled with zeros
+  // so the chart always spans the full requested window.
+  const dayRows = db.prepare(`
+    SELECT substr(timestamp,1,10) as day, session_id, event_type, properties
+    FROM events
+    WHERE timestamp >= datetime('now', ?)
+    ${appSlug ? 'AND app_slug = ?' : ''}
+  `).all(`-${days} days`, ...args);
+
+  const byDay = {};
+  const todayUTC = new Date();
+  for (let i = days - 1; i >= 0; i--) {
+    const d = new Date(todayUTC);
+    d.setUTCDate(d.getUTCDate() - i);
+    const key = d.toISOString().slice(0, 10);
+    byDay[key] = { day: key, sessions: new Set(), purchaseSessions: new Set(), revenue: 0 };
+  }
+  for (const r of dayRows) {
+    const bucket = byDay[r.day];
+    if (!bucket) continue;
+    bucket.sessions.add(r.session_id);
+    if (r.event_type === 'purchase') {
+      bucket.purchaseSessions.add(r.session_id);
+      const v = Number(parseProps(r.properties).value);
+      if (!Number.isNaN(v)) bucket.revenue += v;
+    }
+  }
+  const daily = Object.values(byDay).map(b => ({
+    day: b.day,
+    sessions: b.sessions.size,
+    purchases: b.purchaseSessions.size,
+    conversionRate: b.sessions.size > 0 ? (b.purchaseSessions.size / b.sessions.size) * 100 : 0,
+    revenue: Math.round(b.revenue * 100) / 100,
+  }));
+
+  // Errors — individual rows with a readable summary (not just a bare count),
+  // most recent first, so "app_error x12" becomes an actual, scannable list.
+  const errorPlaceholders = ERROR_EVENT_TYPES.map(() => '?').join(',');
+  const errorRows = db.prepare(`
+    SELECT * FROM events
+    WHERE event_type IN (${errorPlaceholders})
+    ${appSlug ? 'AND app_slug = ?' : ''}
+    ORDER BY id DESC LIMIT 100
+  `).all(...ERROR_EVENT_TYPES, ...args);
+  const errors = errorRows.map(r => {
+    const props = parseProps(r.properties);
+    return {
+      id: r.id,
+      timestamp: r.timestamp,
+      app_slug: r.app_slug,
+      event_type: r.event_type,
+      summary: summarizeError(r.event_type, props),
+      properties: props,
+    };
+  });
 
   const recent = db.prepare(`
     SELECT * FROM events ${where} ORDER BY id DESC LIMIT 100
@@ -169,7 +283,13 @@ app.get('/api/stats', (req, res) => {
     SELECT DISTINCT app_slug FROM events WHERE app_slug IS NOT NULL ORDER BY app_slug
   `).all().map(r => r.app_slug);
 
-  res.json({ total, sessions, users, byType, screenTime, funnel, purchaseSessions, conversionRate, recent, apps });
+  res.json({
+    total, sessions, users, byType, screenTime, funnel, purchaseSessions, conversionRate,
+    revenue: Math.round(revenue * 100) / 100,
+    aov: Math.round(aov * 100) / 100,
+    days, daily, errors,
+    recent, apps,
+  });
 });
 
 // ── SSE stream ────────────────────────────────────────────────────────────────
