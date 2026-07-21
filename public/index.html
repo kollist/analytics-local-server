@@ -126,6 +126,19 @@
   .chart-wrap svg { display: block; }
   .chart-total { font-size: 20px; font-weight: 700; margin-bottom: 2px; }
   .chart-total .unit { font-size: 12px; color: var(--muted); font-weight: 600; margin-left: 4px; }
+  .bar-col { cursor: pointer; }
+  .bar-col .bar-visible { transition: filter .1s ease; }
+  .bar-col:hover .bar-visible { filter: brightness(1.3); }
+  .line-overlay { cursor: crosshair; }
+  .line-dot { transition: r .1s ease; }
+
+  .chart-tooltip {
+    position: fixed; display: none; z-index: 200; pointer-events: none;
+    background: var(--surface); border: 1px solid var(--border); border-radius: 8px;
+    padding: 8px 10px; box-shadow: 0 8px 24px rgba(0,0,0,.4); font-size: 12px;
+  }
+  .chart-tooltip .tt-label { color: var(--muted); margin-bottom: 2px; }
+  .chart-tooltip .tt-value { font-weight: 700; font-size: 14px; }
 
   /* drop-off guide */
   .insight-list { display: flex; flex-direction: column; gap: 14px; }
@@ -258,6 +271,12 @@
   </div>
 </div>
 
+<!-- Trend chart tooltip (shared by all three charts) -->
+<div class="chart-tooltip" id="chart-tooltip">
+  <div class="tt-label"></div>
+  <div class="tt-value"></div>
+</div>
+
 <!-- Event detail modal -->
 <div class="modal-overlay" id="event-modal">
   <div class="modal">
@@ -366,7 +385,11 @@ function fmtDay(day) {
 }
 
 // ── Trend charts (hand-rolled SVG — no chart library, matches the dashboard's
-// own tokens: one hue per chart, thin marks, native <title> tooltips) ──────────
+// own tokens: one hue per chart, thin marks, a real floating tooltip) ─────────
+// Native SVG <title> was tried first but needs a ~1s hover hold and only
+// triggers over the painted pixels, which is why bars barely register on
+// hover. Real fix: an HTML tooltip driven by pointermove, with a hit target
+// that's the full column (bars) or a nearest-point crosshair (line).
 
 function escapeHtml(str) {
   return String(str).replace(/[&<>"']/g, c => ({
@@ -374,8 +397,31 @@ function escapeHtml(str) {
   }[c]));
 }
 
-function barChart(data, { color, valueFmt }) {
-  const width = 400, height = 130;
+const CHART = { width: 400, height: 130 };
+
+function chartTooltip() {
+  return document.getElementById('chart-tooltip');
+}
+
+function showChartTooltip(clientX, clientY, label, value, color) {
+  const el = chartTooltip();
+  el.querySelector('.tt-label').textContent = label;
+  el.querySelector('.tt-value').textContent = value;
+  el.querySelector('.tt-value').style.color = color;
+  el.style.display = 'block';
+  // Clamp so the tooltip never runs off the right edge of the viewport.
+  const ttWidth = el.offsetWidth || 140;
+  const x = Math.min(clientX + 14, window.innerWidth - ttWidth - 8);
+  el.style.left = `${x}px`;
+  el.style.top = `${clientY - 12}px`;
+}
+
+function hideChartTooltip() {
+  chartTooltip().style.display = 'none';
+}
+
+function barChart(data, { color, valueFmt, id }) {
+  const { width, height } = CHART;
   const pad = { top: 10, right: 6, bottom: 18, left: 6 };
   const innerW = width - pad.left - pad.right;
   const innerH = height - pad.top - pad.bottom;
@@ -383,23 +429,41 @@ function barChart(data, { color, valueFmt }) {
   const barW = innerW / data.length;
   const gap = Math.min(6, barW * 0.3);
 
-  let bars = '';
+  let cols = '';
   data.forEach((d, i) => {
     const h = max > 0 ? (d.value / max) * innerH : 0;
-    const x = pad.left + i * barW + gap / 2;
-    const w = Math.max(barW - gap, 1);
+    const colX = pad.left + i * barW;
+    const barX = colX + gap / 2;
+    const barW2 = Math.max(barW - gap, 1);
     const y = pad.top + (innerH - h);
-    bars += `<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${w.toFixed(1)}" height="${Math.max(h, 1).toFixed(1)}" rx="2.5" fill="${color}"><title>${escapeHtml(fmtDay(d.day))}: ${escapeHtml(valueFmt(d.value))}</title></rect>`;
+    // The hit rect spans the FULL column (not just the painted bar) so the
+    // reader doesn't have to land on a thin sliver to get a value.
+    cols += `<g class="bar-col" data-day="${escapeHtml(d.day)}" data-value="${d.value}">
+      <rect class="bar-hit" x="${colX.toFixed(1)}" y="${pad.top}" width="${barW.toFixed(1)}" height="${innerH}" fill="transparent"/>
+      <rect class="bar-visible" x="${barX.toFixed(1)}" y="${y.toFixed(1)}" width="${barW2.toFixed(1)}" height="${Math.max(h, 1).toFixed(1)}" rx="2.5" fill="${color}"/>
+    </g>`;
   });
   const baseline = `<line x1="${pad.left}" y1="${pad.top + innerH}" x2="${width - pad.right}" y2="${pad.top + innerH}" stroke="var(--border)" stroke-width="1"/>`;
   const labels = data.length > 0 ? `
     <text x="${pad.left}" y="${height - 4}" font-size="10" fill="var(--muted)">${escapeHtml(fmtDay(data[0].day))}</text>
     <text x="${width - pad.right}" y="${height - 4}" font-size="10" fill="var(--muted)" text-anchor="end">${escapeHtml(fmtDay(data[data.length - 1].day))}</text>` : '';
-  return `<svg viewBox="0 0 ${width} ${height}" width="100%" height="${height}" preserveAspectRatio="none">${baseline}${bars}${labels}</svg>`;
+  return `<svg id="${id}" viewBox="0 0 ${width} ${height}" width="100%" height="${height}" preserveAspectRatio="none">${baseline}${cols}${labels}</svg>`;
 }
 
-function lineChart(data, { color, max, valueFmt }) {
-  const width = 400, height = 130;
+function wireBarChart(containerId, color, valueFmt) {
+  const svg = document.getElementById(containerId);
+  if (!svg) return;
+  svg.querySelectorAll('.bar-col').forEach(col => {
+    col.addEventListener('pointermove', (ev) => {
+      const { day, value } = col.dataset;
+      showChartTooltip(ev.clientX, ev.clientY, fmtDay(day), valueFmt(Number(value)), color);
+    });
+    col.addEventListener('pointerleave', hideChartTooltip);
+  });
+}
+
+function lineChart(data, { color, max, valueFmt, id }) {
+  const { width, height } = CHART;
   const pad = { top: 14, right: 6, bottom: 18, left: 6 };
   const innerW = width - pad.left - pad.right;
   const innerH = height - pad.top - pad.bottom;
@@ -413,14 +477,51 @@ function lineChart(data, { color, max, valueFmt }) {
     d,
   }));
   const path = points.map((p, i) => `${i === 0 ? 'M' : 'L'}${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ');
-  const dots = points.map(p =>
-    `<circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="3" fill="${color}"><title>${escapeHtml(fmtDay(p.d.day))}: ${escapeHtml(valueFmt(p.d.value))}</title></circle>`
+  const dots = points.map((p, i) =>
+    `<circle class="line-dot" data-i="${i}" cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="3" fill="${color}"/>`
   ).join('');
   const baseline = `<line x1="${pad.left}" y1="${pad.top + innerH}" x2="${width - pad.right}" y2="${pad.top + innerH}" stroke="var(--border)" stroke-width="1"/>`;
   const labels = data.length > 0 ? `
     <text x="${pad.left}" y="${height - 4}" font-size="10" fill="var(--muted)">${escapeHtml(fmtDay(data[0].day))}</text>
     <text x="${width - pad.right}" y="${height - 4}" font-size="10" fill="var(--muted)" text-anchor="end">${escapeHtml(fmtDay(data[data.length - 1].day))}</text>` : '';
-  return `<svg viewBox="0 0 ${width} ${height}" width="100%" height="${height}" preserveAspectRatio="none">${baseline}<path d="${path}" fill="none" stroke="${color}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>${dots}${labels}</svg>`;
+  // Crosshair (hidden until hover) + a full-area transparent overlay that
+  // tracks the pointer and snaps to the nearest data position.
+  const crosshair = `<line id="${id}-crosshair" x1="0" y1="${pad.top}" x2="0" y2="${pad.top + innerH}" stroke="${color}" stroke-width="1" stroke-dasharray="2,2" opacity="0" pointer-events="none"/>`;
+  const overlay = `<rect id="${id}-overlay" class="line-overlay" x="${pad.left}" y="0" width="${innerW}" height="${height}" fill="transparent"/>`;
+  return {
+    svg: `<svg id="${id}" viewBox="0 0 ${width} ${height}" width="100%" height="${height}" preserveAspectRatio="none">${baseline}<path d="${path}" fill="none" stroke="${color}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>${dots}${crosshair}${overlay}</svg>`,
+    points, pad, stepX,
+  };
+}
+
+function wireLineChart(id, built, color, valueFmt) {
+  const svg = document.getElementById(id);
+  if (!svg) return;
+  const overlay = document.getElementById(`${id}-overlay`);
+  const crosshair = document.getElementById(`${id}-crosshair`);
+  const dots = svg.querySelectorAll('.line-dot');
+  const { points, pad, stepX } = built;
+
+  overlay.addEventListener('pointermove', (ev) => {
+    const rect = svg.getBoundingClientRect();
+    const scaleX = CHART.width / rect.width;
+    const xInViewBox = (ev.clientX - rect.left) * scaleX;
+    let idx = stepX > 0 ? Math.round((xInViewBox - pad.left) / stepX) : 0;
+    idx = Math.max(0, Math.min(points.length - 1, idx));
+    const p = points[idx];
+
+    crosshair.setAttribute('x1', p.x);
+    crosshair.setAttribute('x2', p.x);
+    crosshair.setAttribute('opacity', '1');
+    dots.forEach((d, i) => d.setAttribute('r', i === idx ? '5' : '3'));
+
+    showChartTooltip(ev.clientX, ev.clientY, fmtDay(p.d.day), valueFmt(p.d.value), color);
+  });
+  overlay.addEventListener('pointerleave', () => {
+    crosshair.setAttribute('opacity', '0');
+    dots.forEach(d => d.setAttribute('r', '3'));
+    hideChartTooltip();
+  });
 }
 
 function renderTrends(daily) {
@@ -428,17 +529,22 @@ function renderTrends(daily) {
   const totalRevenue  = daily.reduce((s, d) => s + d.revenue, 0);
   const avgConversion = daily.length ? daily.reduce((s, d) => s + d.conversionRate, 0) / daily.length : 0;
 
+  const sessionsFmt = v => `${v} session${v === 1 ? '' : 's'}`;
   document.getElementById('chart-sessions').innerHTML =
     `<div class="chart-total">${totalSessions.toLocaleString()}<span class="unit">sessions</span></div>` +
-    barChart(daily.map(d => ({ day: d.day, value: d.sessions })), { color: 'var(--accent)', valueFmt: v => `${v} sessions` });
+    barChart(daily.map(d => ({ day: d.day, value: d.sessions })), { color: 'var(--accent)', valueFmt: sessionsFmt, id: 'chart-sessions-svg' });
+  wireBarChart('chart-sessions-svg', 'var(--accent)', sessionsFmt);
 
+  const conversionFmt = v => `${v.toFixed(1)}%`;
+  const convBuilt = lineChart(daily.map(d => ({ day: d.day, value: d.conversionRate })), { color: 'var(--green)', max: 100, valueFmt: conversionFmt, id: 'chart-conversion-svg' });
   document.getElementById('chart-conversion').innerHTML =
-    `<div class="chart-total">${avgConversion.toFixed(1)}%<span class="unit">avg</span></div>` +
-    lineChart(daily.map(d => ({ day: d.day, value: d.conversionRate })), { color: 'var(--green)', max: 100, valueFmt: v => `${v.toFixed(1)}%` });
+    `<div class="chart-total">${avgConversion.toFixed(1)}%<span class="unit">avg</span></div>` + convBuilt.svg;
+  wireLineChart('chart-conversion-svg', convBuilt, 'var(--green)', conversionFmt);
 
   document.getElementById('chart-revenue').innerHTML =
     `<div class="chart-total">${fmtMoney(totalRevenue)}<span class="unit">total</span></div>` +
-    barChart(daily.map(d => ({ day: d.day, value: d.revenue })), { color: 'var(--accent)', valueFmt: v => fmtMoney(v) });
+    barChart(daily.map(d => ({ day: d.day, value: d.revenue })), { color: 'var(--accent)', valueFmt: fmtMoney, id: 'chart-revenue-svg' });
+  wireBarChart('chart-revenue-svg', 'var(--accent)', fmtMoney);
 }
 
 // ── Funnel: both "% of top" (overall reach) and "% of previous step" (the
