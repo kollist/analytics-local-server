@@ -60,6 +60,7 @@ function broadcast(event) {
   const data = `data: ${JSON.stringify(event)}\n\n`;
   for (const sub of subscribers) {
     if (sub.appSlug && sub.appSlug !== event.app_slug) continue;
+    if (sub.platform && sub.platform !== event.platform) continue;
     try { sub.res.write(data); } catch { subscribers.delete(sub); }
   }
 }
@@ -158,9 +159,17 @@ app.post('/api/v1/events', (req, res) => {
 // ── Dashboard API ─────────────────────────────────────────────────────────────
 
 app.get('/api/stats', (req, res) => {
-  const appSlug = req.query.app_slug || null;
-  const where   = appSlug ? 'WHERE app_slug = ?' : '';
-  const args    = appSlug ? [appSlug] : [];
+  const appSlug  = req.query.app_slug || null;
+  const platform = req.query.platform || null;
+
+  // Both filters are optional and independent ("all apps" / "all platforms"),
+  // so build the WHERE clause from whichever ones are actually set.
+  const filters = [];
+  const args    = [];
+  if (appSlug)  { filters.push('app_slug = ?');  args.push(appSlug); }
+  if (platform) { filters.push('platform = ?');  args.push(platform); }
+  const where     = filters.length ? `WHERE ${filters.join(' AND ')}` : '';
+  const andClause = filters.length ? `AND ${filters.join(' AND ')}`   : '';
   const days    = Math.min(Math.max(parseInt(req.query.days, 10) || 14, 1), 90);
 
   const total    = db.prepare(`SELECT COUNT(*) as n FROM events ${where}`).get(...args).n;
@@ -179,7 +188,7 @@ app.get('/api/stats', (req, res) => {
            COUNT(*) as views
     FROM events
     WHERE event_type = 'screen_exited' AND screen_name IS NOT NULL AND duration_ms IS NOT NULL
-    ${appSlug ? 'AND app_slug = ?' : ''}
+    ${andClause}
     GROUP BY screen_name ORDER BY avg_sec DESC
   `).all(...args);
 
@@ -193,7 +202,7 @@ app.get('/api/stats', (req, res) => {
   const stepStmt = db.prepare(`
     SELECT COUNT(DISTINCT session_id) as n FROM events
     WHERE event_type = ?
-    ${appSlug ? 'AND app_slug = ?' : ''}
+    ${andClause}
   `);
   const funnel = FUNNEL_STEPS.map((step, i) => {
     const stepSessions = stepStmt.get(step, ...args).n;
@@ -218,7 +227,7 @@ app.get('/api/stats', (req, res) => {
   // rather than in SQL.
   const purchaseRows = db.prepare(`
     SELECT properties FROM events
-    WHERE event_type = 'purchase' ${appSlug ? 'AND app_slug = ?' : ''}
+    WHERE event_type = 'purchase' ${andClause}
   `).all(...args);
   let revenue = 0;
   for (const r of purchaseRows) {
@@ -234,7 +243,7 @@ app.get('/api/stats', (req, res) => {
     SELECT substr(timestamp,1,10) as day, session_id, event_type, properties
     FROM events
     WHERE timestamp >= datetime('now', ?)
-    ${appSlug ? 'AND app_slug = ?' : ''}
+    ${andClause}
   `).all(`-${days} days`, ...args);
 
   const byDay = {};
@@ -269,7 +278,7 @@ app.get('/api/stats', (req, res) => {
   const errorRows = db.prepare(`
     SELECT * FROM events
     WHERE event_type IN (${errorPlaceholders})
-    ${appSlug ? 'AND app_slug = ?' : ''}
+    ${andClause}
     ORDER BY id DESC LIMIT 100
   `).all(...ERROR_EVENT_TYPES, ...args);
   const errors = errorRows.map(r => {
@@ -292,12 +301,18 @@ app.get('/api/stats', (req, res) => {
     SELECT DISTINCT app_slug FROM events WHERE app_slug IS NOT NULL ORDER BY app_slug
   `).all().map(r => r.app_slug);
 
+  // Unfiltered so the platform dropdown always lists every platform ever seen,
+  // not just the ones left over after the current filters are applied.
+  const platforms = db.prepare(`
+    SELECT DISTINCT platform FROM events WHERE platform IS NOT NULL ORDER BY platform
+  `).all().map(r => r.platform);
+
   res.json({
     total, sessions, users, byType, screenTime, funnel, purchaseSessions, conversionRate,
     revenue: Math.round(revenue * 100) / 100,
     aov: Math.round(aov * 100) / 100,
     days, daily, errors,
-    recent, apps,
+    recent, apps, platforms,
   });
 });
 
@@ -310,7 +325,7 @@ app.get('/api/stream', (req, res) => {
     'Connection':    'keep-alive',
   });
   res.flushHeaders();
-  const sub = { res, appSlug: req.query.app_slug || null };
+  const sub = { res, appSlug: req.query.app_slug || null, platform: req.query.platform || null };
   subscribers.add(sub);
   req.on('close', () => subscribers.delete(sub));
 });

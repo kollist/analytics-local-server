@@ -165,6 +165,9 @@
   <select id="app-filter">
     <option value="">All apps</option>
   </select>
+  <select id="platform-filter">
+    <option value="">All platforms</option>
+  </select>
   <select id="days-filter">
     <option value="7">Last 7 days</option>
     <option value="14" selected>Last 14 days</option>
@@ -658,12 +661,18 @@ function renderStats(s) {
   document.getElementById('kpi-revenue').textContent    = fmtMoney(s.revenue);
   document.getElementById('kpi-aov').textContent        = fmtMoney(s.aov);
 
-  // app filter dropdown (preserve current selection)
+  // app / platform filter dropdowns (preserve current selection)
   const select = document.getElementById('app-filter');
   const current = select.value;
   select.innerHTML = '<option value="">All apps</option>' +
     s.apps.map(a => `<option value="${a}">${a}</option>`).join('');
   select.value = current;
+
+  const platformSelect = document.getElementById('platform-filter');
+  const currentPlatform = platformSelect.value;
+  platformSelect.innerHTML = '<option value="">All platforms</option>' +
+    s.platforms.map(p => `<option value="${p}">${p}</option>`).join('');
+  platformSelect.value = currentPlatform;
 
   renderTrends(s.daily);
   renderFunnel(s.funnel);
@@ -779,14 +788,19 @@ document.addEventListener('keydown', (ev) => {
 function currentApp() {
   return document.getElementById('app-filter').value;
 }
+function currentPlatform() {
+  return document.getElementById('platform-filter').value;
+}
 function currentDays() {
   return document.getElementById('days-filter').value;
 }
 
 async function load() {
   const appSlug = currentApp();
+  const platform = currentPlatform();
   const params = new URLSearchParams();
   if (appSlug) params.set('app_slug', appSlug);
+  if (platform) params.set('platform', platform);
   params.set('days', currentDays());
   const r = await fetch('/api/stats?' + params.toString());
   const s = await r.json();
@@ -795,12 +809,17 @@ async function load() {
 load();
 setInterval(load, 10000); // refresh stats every 10s
 
-// real-time feed via SSE — recreated whenever the app filter changes
+// real-time feed via SSE — recreated whenever the app/platform filter changes
 let es;
 function connectStream() {
   if (es) es.close();
   const appSlug = currentApp();
-  es = new EventSource('/api/stream' + (appSlug ? `?app_slug=${encodeURIComponent(appSlug)}` : ''));
+  const platform = currentPlatform();
+  const params = new URLSearchParams();
+  if (appSlug) params.set('app_slug', appSlug);
+  if (platform) params.set('platform', platform);
+  const qs = params.toString();
+  es = new EventSource('/api/stream' + (qs ? `?${qs}` : ''));
   es.onmessage = e => {
     const event = JSON.parse(e.data);
     prependRow(event);
@@ -812,6 +831,10 @@ function connectStream() {
 connectStream();
 
 document.getElementById('app-filter').addEventListener('change', () => {
+  load();
+  connectStream();
+});
+document.getElementById('platform-filter').addEventListener('change', () => {
   load();
   connectStream();
 });
