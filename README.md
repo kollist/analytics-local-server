@@ -9,12 +9,16 @@ files inside this repo's working directory (this is *not* a plain `git pull` —
 it resets the tree). `analytics.sqlite` is gitignored, so a push here would
 delete the entire event history unless it lives outside the deploy path.
 
-`server.js` handles this automatically: it looks for a sibling `analytics-data/`
-directory next to this repo (i.e. `../analytics-data/analytics.sqlite` relative
-to `server.js`) and uses that if present, since deploys never touch anything
-outside the git working tree. If it's not there (e.g. a fresh clone, or local
-dev), it falls back to `analytics.sqlite` inside this directory — zero setup
-needed locally.
+`server.js` handles this automatically: it walks up from `server.js` looking
+for an `analytics-data/` directory (checking the immediate parent first, then
+a few more ancestor levels) and uses that if found, since deploys never touch
+anything outside the git working tree. The multi-level walk matters because
+some hosts (e.g. Hostinger's Node.js auto-deploy) don't deploy into a fixed
+directory — every push builds a fresh versioned folder several levels deep
+(`.../hbuilds/versions/<uuid>/nodejs`) — so a plain sibling check would miss
+it. If no `analytics-data/` is found anywhere up the tree (e.g. a fresh clone,
+or local dev), it falls back to `analytics.sqlite` inside this directory —
+zero setup needed locally.
 
 **First-time setup on a new host:**
 

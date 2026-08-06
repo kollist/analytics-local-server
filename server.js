@@ -8,13 +8,29 @@ const fs = require('fs');
 // ── Database setup ────────────────────────────────────────────────────────────
 // Auto-deploy on the host wipes this directory's untracked files on every
 // push (it's a git working tree, not just a plain deploy target), which
-// takes analytics.sqlite with it. If a sibling `analytics-data/` directory
-// exists next to this repo (outside the git working tree, so deploys never
+// takes analytics.sqlite with it. If an `analytics-data/` directory exists
+// somewhere above this repo (outside the git working tree, so deploys never
 // touch it), the database lives there instead — see the deploy README for
 // how that directory is set up on the host. Falls back to __dirname so local
 // dev / a fresh clone still works with zero setup.
-const persistentDir = path.join(__dirname, '..', 'analytics-data');
-const dbDir = fs.existsSync(persistentDir) ? persistentDir : __dirname;
+//
+// Some hosts (e.g. Hostinger's Node.js auto-deploy) don't deploy straight
+// into a fixed directory — every push builds a fresh versioned folder several
+// levels deep (.../hbuilds/versions/<uuid>/nodejs) and symlinks the live app
+// at it. A single ".." wouldn't find `analytics-data` there, so walk up a
+// handful of ancestor levels instead of checking only the immediate parent.
+function findPersistentDir(startDir) {
+  let dir = path.dirname(startDir);
+  for (let i = 0; i < 6; i++) {
+    const candidate = path.join(dir, 'analytics-data');
+    if (fs.existsSync(candidate)) return candidate;
+    const parent = path.dirname(dir);
+    if (parent === dir) break; // reached filesystem root
+    dir = parent;
+  }
+  return null;
+}
+const dbDir = findPersistentDir(__dirname) || __dirname;
 const db = new Database(path.join(dbDir, 'analytics.sqlite'));
 
 // Batch-payload schema (app_slug + platform, device_model now optional).
