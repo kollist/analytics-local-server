@@ -240,6 +240,7 @@
       <span style="margin-left:auto"></span>
       <span class="tabs" id="lb-tabs">
         <button class="tab active" data-view="top">Top performers</button>
+        <button class="tab" data-view="best">Best converting</button>
         <button class="tab" data-view="under">Underperformers</button>
       </span>
     </h2>
@@ -604,13 +605,16 @@ let lbView = 'top';
 let lbExpanded = false;
 const LB_COLLAPSED = 10;
 const LB_NUM_COLS = ['orders', 'gmv', 'conversionRate', 'aov', 'users'];
+const LB_MIN_SESSIONS = 30; // traffic floor for the conversion-ranked views
 
 function renderLeaderboard(perApp) { lbData = perApp || []; paintLeaderboard(); }
 
 function currentRows() {
-  if (lbView === 'under') {
-    const busy = lbData.filter(r => r.sessions >= 30);
-    return busy.slice().sort((a, b) => a.conversionRate - b.conversionRate);
+  if (lbView === 'best' || lbView === 'under') {
+    const dir = lbView === 'best' ? -1 : 1; // best converting first / worst converting first
+    return lbData
+      .filter(r => r.sessions >= LB_MIN_SESSIONS)
+      .sort((a, b) => (a.conversionRate - b.conversionRate) * dir);
   }
   const { key, dir } = lbSort;
   return [...lbData].sort((a, b) => {
@@ -641,7 +645,10 @@ function paintLeaderboard() {
 
   const tb = document.getElementById('lb-body');
   if (!rows.length) {
-    tb.innerHTML = `<tr><td colspan="6" style="color:var(--muted)">${lbView === 'under' ? 'No apps with enough traffic yet' : 'No app data in this window'}</td></tr>`;
+    const msg = (lbView === 'best' || lbView === 'under')
+      ? `No apps with at least ${LB_MIN_SESSIONS} sessions in this window`
+      : 'No app data in this window';
+    tb.innerHTML = `<tr><td colspan="6" style="color:var(--muted)">${msg}</td></tr>`;
   } else {
     tb.innerHTML = shown.map((r, i) => `<tr class="lb-row" data-app="${escapeHtml(r.app_slug)}">
       <td><span class="lb-rank">${i + 1}</span>${escapeHtml(r.app_slug)}</td>
