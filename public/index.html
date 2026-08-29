@@ -153,6 +153,14 @@
     border: 1px solid rgba(239,68,68,.25); border-radius: 8px; padding: 6px 10px; font-size: 12px;
   }
   .err-pill b { color: var(--red); font-size: 13px; }
+
+  /* app leaderboard */
+  #leaderboard th { cursor: pointer; user-select: none; white-space: nowrap; }
+  #leaderboard th.sorted { color: var(--text); }
+  #leaderboard td.num, #leaderboard th.num { text-align: right; }
+  #leaderboard tr.lb-row { cursor: pointer; }
+  #leaderboard td.lb-best { color: var(--green); font-weight: 700; }
+  #leaderboard .lb-rank { color: var(--muted); font-size: 11px; margin-right: 6px; }
 </style>
 </head>
 <body>
@@ -201,6 +209,28 @@
   <div class="card">
     <h2>Revenue / day</h2>
     <div class="chart-wrap" id="chart-revenue"></div>
+  </div>
+</div>
+
+<!-- App leaderboard -->
+<div class="full-col">
+  <div class="card">
+    <h2>App Leaderboard <span style="text-transform:none;letter-spacing:0;color:var(--muted)">— all time, click a column to sort, click a row to filter</span></h2>
+    <br/>
+    <table id="leaderboard">
+      <thead>
+        <tr>
+          <th data-sort="app_slug">App</th>
+          <th class="num" data-sort="sessions">Sessions</th>
+          <th class="num" data-sort="users">Users</th>
+          <th class="num" data-sort="orders">Orders</th>
+          <th class="num" data-sort="conversionRate">Conv %</th>
+          <th class="num" data-sort="revenue">Revenue</th>
+          <th class="num" data-sort="aov">AOV</th>
+        </tr>
+      </thead>
+      <tbody id="leaderboard-body"></tbody>
+    </table>
   </div>
 </div>
 
@@ -653,6 +683,73 @@ function renderErrors(errors) {
   });
 }
 
+// ── App leaderboard: every app side by side, sortable ────────────────────────
+
+let lbData = [];
+let lbSort = { key: 'sessions', dir: -1 };
+
+const LB_COLS = ['sessions', 'users', 'orders', 'conversionRate', 'revenue', 'aov'];
+
+function renderLeaderboard(perApp) {
+  lbData = perApp || [];
+  paintLeaderboard();
+}
+
+function paintLeaderboard() {
+  const { key, dir } = lbSort;
+  const rows = [...lbData].sort((a, b) => {
+    const av = a[key], bv = b[key];
+    if (typeof av === 'string') return av.localeCompare(bv) * dir;
+    return (av - bv) * dir;
+  });
+
+  const best = {};
+  for (const k of LB_COLS) best[k] = Math.max(0, ...lbData.map(r => r[k]));
+
+  const cell = (r, k, text) =>
+    `<td class="num${r[k] > 0 && r[k] === best[k] ? ' lb-best' : ''}">${text}</td>`;
+
+  const tbody = document.getElementById('leaderboard-body');
+  if (rows.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="7" style="color:var(--muted)">No app data yet</td></tr>`;
+  } else {
+    tbody.innerHTML = rows.map((r, i) => `
+      <tr class="lb-row" data-app="${escapeHtml(r.app_slug)}">
+        <td><span class="lb-rank">${i + 1}</span>${escapeHtml(r.app_slug)}</td>
+        ${cell(r, 'sessions', r.sessions.toLocaleString())}
+        ${cell(r, 'users', r.users.toLocaleString())}
+        ${cell(r, 'orders', r.orders.toLocaleString())}
+        ${cell(r, 'conversionRate', r.conversionRate.toFixed(1) + '%')}
+        ${cell(r, 'revenue', fmtMoney(r.revenue))}
+        ${cell(r, 'aov', fmtMoney(r.aov))}
+      </tr>
+    `).join('');
+    tbody.querySelectorAll('tr.lb-row').forEach(tr => {
+      tr.addEventListener('click', () => {
+        document.getElementById('app-filter').value = tr.dataset.app;
+        load();
+        connectStream();
+      });
+    });
+  }
+
+  document.querySelectorAll('#leaderboard th').forEach(th => {
+    const k = th.dataset.sort;
+    const base = th.textContent.replace(/ [▲▼]$/, '');
+    th.classList.toggle('sorted', k === key);
+    th.textContent = k === key ? `${base} ${dir < 0 ? '▼' : '▲'}` : base;
+  });
+}
+
+document.querySelectorAll('#leaderboard th').forEach(th => {
+  th.addEventListener('click', () => {
+    const k = th.dataset.sort;
+    if (lbSort.key === k) lbSort.dir *= -1;
+    else lbSort = { key: k, dir: k === 'app_slug' ? 1 : -1 };
+    paintLeaderboard();
+  });
+});
+
 function renderStats(s) {
   document.getElementById('kpi-total').textContent      = s.total.toLocaleString();
   document.getElementById('kpi-sessions').textContent   = s.sessions.toLocaleString();
@@ -674,6 +771,7 @@ function renderStats(s) {
     s.platforms.map(p => `<option value="${p}">${p}</option>`).join('');
   platformSelect.value = currentPlatform;
 
+  renderLeaderboard(s.perApp);
   renderTrends(s.daily);
   renderFunnel(s.funnel);
   renderEventTypes(s.byType);

@@ -317,6 +317,48 @@ app.get('/api/stats', (req, res) => {
     SELECT DISTINCT app_slug FROM events WHERE app_slug IS NOT NULL ORDER BY app_slug
   `).all().map(r => r.app_slug);
 
+  // Per-app leaderboard — every app side by side so you can see which one leads
+  // on sessions, orders, conversion, revenue. Respects the platform filter (so
+  // it reconciles with the KPI cards) but never the app filter, and — like the
+  // KPI cards — spans all time rather than the trend window.
+  const platformOnly = platform ? 'AND platform = ?' : '';
+  const platformArgs = platform ? [platform] : [];
+
+  const perAppRows = db.prepare(`
+    SELECT app_slug,
+           COUNT(*)                                                              AS events,
+           COUNT(DISTINCT session_id)                                            AS sessions,
+           COUNT(DISTINCT anonymous_id)                                          AS users,
+           COUNT(DISTINCT CASE WHEN event_type = 'purchase' THEN session_id END) AS purchaseSessions,
+           SUM(CASE WHEN event_type = 'purchase' THEN 1 ELSE 0 END)              AS orders
+    FROM events
+    WHERE app_slug IS NOT NULL ${platformOnly}
+    GROUP BY app_slug
+  `).all(...platformArgs);
+
+  const perAppRevenue = {};
+  for (const r of db.prepare(`
+    SELECT app_slug, properties FROM events
+    WHERE event_type = 'purchase' AND app_slug IS NOT NULL ${platformOnly}
+  `).all(...platformArgs)) {
+    const v = Number(parseProps(r.properties).value);
+    if (!Number.isNaN(v)) perAppRevenue[r.app_slug] = (perAppRevenue[r.app_slug] || 0) + v;
+  }
+
+  const perApp = perAppRows.map(r => {
+    const rev = perAppRevenue[r.app_slug] || 0;
+    return {
+      app_slug: r.app_slug,
+      events: r.events,
+      sessions: r.sessions,
+      users: r.users,
+      orders: r.orders,
+      conversionRate: r.sessions > 0 ? (r.purchaseSessions / r.sessions) * 100 : 0,
+      revenue: Math.round(rev * 100) / 100,
+      aov: r.orders > 0 ? Math.round((rev / r.orders) * 100) / 100 : 0,
+    };
+  }).sort((a, b) => b.sessions - a.sessions);
+
   // Unfiltered so the platform dropdown always lists every platform ever seen,
   // not just the ones left over after the current filters are applied.
   const platforms = db.prepare(`
@@ -327,7 +369,7 @@ app.get('/api/stats', (req, res) => {
     total, sessions, users, byType, screenTime, funnel, purchaseSessions, conversionRate,
     revenue: Math.round(revenue * 100) / 100,
     aov: Math.round(aov * 100) / 100,
-    days, daily, errors,
+    days, daily, errors, perApp,
     recent, apps, platforms,
   });
 });
