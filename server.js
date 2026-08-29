@@ -209,16 +209,13 @@ app.post('/api/v1/events', (req, res) => {
     }
   });
   insertMany(events);
-  if (inserted > 0) { statsEpoch++; totalEvents += inserted; }
+  if (inserted > 0) statsEpoch++; // marks the dashboard caches stale
 
   res.json({ received: inserted });
 });
 
 // ── Dashboard API ─────────────────────────────────────────────────────────────
 
-// `SELECT COUNT(*)` over the whole (multi-GB) table was one of the full scans on
-// every dashboard load. Count once at startup, then keep it current from ingest.
-let totalEvents = db.prepare('SELECT COUNT(*) AS n FROM events').get().n;
 let statsEpoch = 0; // bumped on every ingest; marks the caches below stale
 
 // ── Aggregation worker ───────────────────────────────────────────────────────
@@ -308,7 +305,6 @@ app.get('/api/stats', async (req, res) => {
     appSlug: req.query.app_slug || null,
     platform: req.query.platform || null,
     days: Math.min(Math.max(parseInt(req.query.days, 10) || 14, 1), 90),
-    totalEvents,
   };
   try {
     res.json(await getCached('stats', params));
@@ -338,8 +334,8 @@ app.get('/api/errors', async (req, res) => {
 function warmCaches() {
   if (!indexesReady || !worker) return;
   Promise.allSettled([
-    getCached('stats', { appSlug: null, platform: null, days: 14, totalEvents }),
-    getCached('stats', { appSlug: null, platform: null, days: 30, totalEvents }),
+    getCached('stats', { appSlug: null, platform: null, days: 14 }),
+    getCached('stats', { appSlug: null, platform: null, days: 30 }),
     getCached('errors', { appSlug: null, platform: null, days: 30, limit: 50, offset: 0, type: null }),
   ]);
 }
@@ -365,7 +361,7 @@ app.listen(PORT, '0.0.0.0', () => {
   console.log(`\n🚀 Analytics local server running`);
   console.log(`   Dashboard: http://localhost:${PORT}`);
   console.log(`   Endpoint:  http://localhost:${PORT}/api/v1/events  (no auth required)`);
-  console.log(`   DB: ${path.join(dbDir, 'analytics.sqlite')}  (${totalEvents.toLocaleString()} events, journal_mode=${db.pragma('journal_mode', { simple: true })})\n`);
+  console.log(`   DB: ${path.join(dbDir, 'analytics.sqlite')}  (journal_mode=${db.pragma('journal_mode', { simple: true })})\n`);
 
   startWorker();
 
