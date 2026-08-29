@@ -21,6 +21,9 @@
     padding: 16px 24px; display: flex; align-items: center; gap: 12px;
   }
   header h1 { font-size: 18px; font-weight: 700; }
+  .nav-link { color: var(--accent); text-decoration: none; font-size: 13px; font-weight: 600;
+              border: 1px solid var(--border); border-radius: 6px; padding: 4px 10px; }
+  .nav-link:hover { background: rgba(108,99,255,.12); }
   select {
     background: var(--surface); color: var(--text); border: 1px solid var(--border);
     border-radius: 6px; padding: 4px 8px; font-family: inherit; font-size: 13px;
@@ -93,7 +96,7 @@
   ::-webkit-scrollbar-track { background: transparent; }
   ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
 
-  #feed tr, #errors tr.err-row { cursor: pointer; }
+  #feed tr { cursor: pointer; }
 
   /* event detail modal */
   .modal-overlay {
@@ -155,13 +158,6 @@
   .insight .body b { color: var(--text); }
   .insight .body { color: var(--muted); font-size: 13px; line-height: 1.6; }
 
-  .err-summary-row { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 14px; }
-  .err-pill {
-    display: flex; align-items: center; gap: 6px; background: rgba(239,68,68,.08);
-    border: 1px solid rgba(239,68,68,.25); border-radius: 8px; padding: 6px 10px; font-size: 12px;
-  }
-  .err-pill b { color: var(--red); font-size: 13px; }
-
   /* app leaderboard */
   #leaderboard th { cursor: pointer; user-select: none; white-space: nowrap; }
   #leaderboard th.sorted { color: var(--text); }
@@ -192,6 +188,7 @@
     <option value="30">Last 30 days</option>
     <option value="90">Last 90 days</option>
   </select>
+  <a class="nav-link" href="/errors.html">Errors →</a>
   <div class="live-label">LIVE</div>
   <div class="dot"></div>
 </header>
@@ -268,22 +265,13 @@
 </div>
 
 <!-- Screen time -->
-<div class="two-col">
+<div class="full-col">
   <div class="card">
     <h2>Avg Time per Screen (seconds)</h2>
     <br/>
     <table>
       <thead><tr><th>Screen</th><th>Avg s</th><th>Views</th></tr></thead>
       <tbody id="screen-time"></tbody>
-    </table>
-  </div>
-  <div class="card">
-    <h2>Errors</h2>
-    <br/>
-    <div class="err-summary-row" id="error-summary"></div>
-    <table>
-      <thead><tr><th>Time</th><th>App</th><th>Type</th><th>Detail</th></tr></thead>
-      <tbody id="errors"></tbody>
     </table>
   </div>
 </div>
@@ -614,7 +602,7 @@ function renderFunnel(funnel) {
 
 // ── Drop-off Guide: computed from the actual data instead of static copy ──────
 
-function renderInsights(funnel, screenTime, errors) {
+function renderInsights(funnel, screenTime) {
   const items = [];
 
   // Biggest relative drop between consecutive funnel steps.
@@ -643,54 +631,14 @@ function renderInsights(funnel, screenTime, errors) {
     });
   }
 
-  // Most frequent error in the current window.
-  if (errors.length > 0) {
-    const counts = {};
-    for (const e of errors) counts[e.summary] = (counts[e.summary] || 0) + 1;
-    const [topSummary, topCount] = Object.entries(counts).sort((a, b) => b[1] - a[1])[0];
-    items.push({
-      ic: '🛑',
-      body: `${errors.length} error${errors.length === 1 ? '' : 's'} recorded recently. Most common: <b>${escapeHtml(topSummary)}</b> (${topCount}×). See the Errors panel for the full list.`,
-    });
-  } else {
-    items.push({ ic: '✅', body: `No errors recorded in the current window.` });
-  }
+  items.push({
+    ic: '🛑',
+    body: `Errors (crashes, failed orders, failed logins) now live on their own page — open <b><a href="/errors.html" style="color:var(--accent)">Errors →</a></b> for the grouped, filterable breakdown.`,
+  });
 
   document.getElementById('insights').innerHTML = items.map(it =>
     `<div class="insight"><div class="ic">${it.ic}</div><div class="body">${it.body}</div></div>`
   ).join('');
-}
-
-// ── Errors panel: an actual readable list, not just a bare count ──────────────
-
-function renderErrors(errors) {
-  const summaryEl = document.getElementById('error-summary');
-  const counts = {};
-  for (const e of errors) counts[e.event_type] = (counts[e.event_type] || 0) + 1;
-  const labels = { app_error: 'App errors', order_place_failed: 'Order failures', login_failed: 'Login failures' };
-  summaryEl.innerHTML = Object.keys(labels).map(type =>
-    counts[type] ? `<div class="err-pill"><b>${counts[type]}</b> ${labels[type]}</div>` : ''
-  ).join('') || `<div style="color:var(--muted);font-size:12px">No errors recorded 🎉</div>`;
-
-  const tbody = document.getElementById('errors');
-  if (errors.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="4" style="color:var(--muted)">No errors recorded 🎉</td></tr>`;
-    return;
-  }
-  tbody.innerHTML = errors.slice(0, 30).map(e => `
-    <tr class="err-row" data-error-id="${e.id}">
-      <td class="ts">${fmt(e.timestamp)}</td>
-      <td class="ts">${e.app_slug || ''}</td>
-      <td><span class="badge badge-error">${e.event_type}</span></td>
-      <td class="props" style="max-width:420px">${escapeHtml(e.summary)}</td>
-    </tr>
-  `).join('');
-  tbody.querySelectorAll('tr.err-row').forEach(tr => {
-    tr.addEventListener('click', () => {
-      const e = errors.find(x => String(x.id) === tr.dataset.errorId);
-      if (e) showEventDetail({ ...e, properties: e.properties, anonymous_id: '', session_id: '', screen_name: null, duration_ms: null });
-    });
-  });
 }
 
 // ── App leaderboard: every app side by side, sortable ────────────────────────
@@ -785,8 +733,7 @@ function renderStats(s) {
   renderTrends(s.daily);
   renderFunnel(s.funnel);
   renderEventTypes(s.byType);
-  renderErrors(s.errors);
-  renderInsights(s.funnel, s.screenTime, s.errors);
+  renderInsights(s.funnel, s.screenTime);
 
   // screen time
   document.getElementById('screen-time').innerHTML = s.screenTime.map(r =>

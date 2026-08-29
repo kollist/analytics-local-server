@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Errors · Analytics</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg: #0f1117; --surface: #1a1d27; --border: #2a2d3a;
+    --accent: #6c63ff; --green: #22c55e; --yellow: #f59e0b;
+    --red: #ef4444; --text: #e2e8f0; --muted: #64748b;
+    --font: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  }
+  body { background: var(--bg); color: var(--text); font-family: var(--font); font-size: 14px; }
+
+  header {
+    background: var(--surface); border-bottom: 1px solid var(--border);
+    padding: 16px 24px; display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+  }
+  header h1 { font-size: 18px; font-weight: 700; }
+  .nav-link { color: var(--accent); text-decoration: none; font-size: 13px; font-weight: 600;
+              border: 1px solid var(--border); border-radius: 6px; padding: 4px 10px; }
+  .nav-link:hover { background: rgba(108,99,255,.12); }
+  select {
+    background: var(--surface); color: var(--text); border: 1px solid var(--border);
+    border-radius: 6px; padding: 4px 8px; font-family: inherit; font-size: 13px;
+  }
+  .spacer { margin-left: auto; }
+  #loadbar {
+    position: fixed; top: 0; left: 0; height: 2px; width: 100%;
+    background: var(--accent); transform: scaleX(0); transform-origin: left;
+    transition: transform .2s ease, opacity .3s ease; opacity: 0; z-index: 300;
+  }
+  body.loading #loadbar { transform: scaleX(0.8); opacity: 1; transition: transform 8s ease, opacity .1s; }
+
+  .wrap { padding: 24px; display: flex; flex-direction: column; gap: 16px; }
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 20px; }
+  .card h2 { font-size: 11px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); margin-bottom: 12px; }
+
+  .pills { display: flex; gap: 10px; flex-wrap: wrap; }
+  .pill {
+    display: flex; align-items: baseline; gap: 6px; background: rgba(239,68,68,.08);
+    border: 1px solid rgba(239,68,68,.25); border-radius: 8px; padding: 8px 12px;
+  }
+  .pill b { color: var(--red); font-size: 18px; font-weight: 700; }
+  .pill span { color: var(--muted); font-size: 12px; }
+  .pill.neutral { background: rgba(108,99,255,.08); border-color: rgba(108,99,255,.25); }
+  .pill.neutral b { color: var(--accent); }
+
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th { text-align: left; color: var(--muted); font-weight: 600; font-size: 11px;
+       text-transform: uppercase; letter-spacing: .06em;
+       border-bottom: 1px solid var(--border); padding: 8px 10px; white-space: nowrap; }
+  td { padding: 8px 10px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  tr:last-child td { border-bottom: none; }
+  tbody tr.clickable { cursor: pointer; }
+  tbody tr.clickable:hover td { background: rgba(255,255,255,.03); }
+  .num { text-align: right; font-variant-numeric: tabular-nums; }
+  .ts { color: var(--muted); font-size: 11px; white-space: nowrap; }
+  .sig { max-width: 620px; }
+  .mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; }
+
+  .badge { display: inline-block; padding: 2px 8px; border-radius: 99px; font-size: 11px; font-weight: 600; }
+  .badge-app_error         { background: rgba(239,68,68,.15);  color: var(--red); }
+  .badge-order_place_failed { background: rgba(245,158,11,.15); color: var(--yellow); }
+  .badge-login_failed      { background: rgba(108,99,255,.15); color: var(--accent); }
+
+  .expand-row td { background: rgba(0,0,0,.25); }
+  .expand-row pre {
+    white-space: pre-wrap; word-break: break-word; font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 12px; color: var(--text); max-height: 320px; overflow: auto;
+  }
+  .apps-line { color: var(--muted); font-size: 11px; margin-top: 4px; }
+
+  .pager { display: flex; align-items: center; gap: 12px; margin-top: 12px; font-size: 13px; color: var(--muted); }
+  .pager button {
+    background: var(--surface); color: var(--text); border: 1px solid var(--border);
+    border-radius: 6px; padding: 4px 12px; font-family: inherit; font-size: 13px; cursor: pointer;
+  }
+  .pager button:disabled { opacity: .4; cursor: default; }
+
+  .empty { color: var(--muted); padding: 8px 10px; }
+  .hint { color: var(--muted); font-size: 11px; margin-top: 10px; }
+
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+  .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.5);
+    align-items: center; justify-content: center; z-index: 100; }
+  .modal-overlay.open { display: flex; }
+  .modal { background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
+    width: 620px; max-width: 92vw; max-height: 85vh; overflow-y: auto; padding: 24px; }
+  .modal-header { display: flex; align-items: center; gap: 10px; margin-bottom: 16px; }
+  .modal-header h3 { font-size: 15px; font-weight: 700; flex: 1; }
+  .modal-close { background: none; border: none; color: var(--muted); font-size: 20px; cursor: pointer; }
+  .detail-table td { padding: 6px 10px; }
+  .detail-table td:first-child { color: var(--muted); font-weight: 600; white-space: nowrap; width: 130px; }
+</style>
+</head>
+<body>
+
+<div id="loadbar"></div>
+
+<header>
+  <h1>Errors</h1>
+  <a class="nav-link" href="/">← Dashboard</a>
+  <select id="app-filter"><option value="">All apps</option></select>
+  <select id="platform-filter"><option value="">All platforms</option></select>
+  <select id="type-filter">
+    <option value="">All types</option>
+    <option value="app_error">App errors</option>
+    <option value="order_place_failed">Order failures</option>
+    <option value="login_failed">Login failures</option>
+  </select>
+  <select id="days-filter">
+    <option value="7">Last 7 days</option>
+    <option value="30" selected>Last 30 days</option>
+    <option value="90">Last 90 days</option>
+    <option value="365">Last 365 days</option>
+    <option value="">All time</option>
+  </select>
+</header>
+
+<div class="wrap">
+  <div class="card">
+    <h2>Totals in window</h2>
+    <div class="pills" id="pills"></div>
+  </div>
+
+  <div class="card">
+    <h2>Grouped by signature</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Signature</th><th>Type</th><th class="num">Count</th>
+          <th class="num">Apps</th><th>First seen</th><th>Last seen</th>
+        </tr>
+      </thead>
+      <tbody id="grouped"></tbody>
+    </table>
+    <div class="hint" id="grouped-hint"></div>
+  </div>
+
+  <div class="card">
+    <h2>Recent errors</h2>
+    <table>
+      <thead>
+        <tr><th>Time</th><th>App</th><th>Platform</th><th>Type</th><th>Detail</th></tr>
+      </thead>
+      <tbody id="list"></tbody>
+    </table>
+    <div class="pager">
+      <button id="prev">← Newer</button>
+      <span id="page-label"></span>
+      <button id="next">Older →</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="modal">
+  <div class="modal">
+    <div class="modal-header">
+      <h3 id="modal-title">Error</h3>
+      <button class="modal-close" id="modal-close" aria-label="Close">&times;</button>
+    </div>
+    <table class="detail-table" id="modal-detail"></table>
+    <h2 style="margin:14px 0 8px">Properties</h2>
+    <pre class="mono" id="modal-props" style="white-space:pre-wrap;word-break:break-word"></pre>
+  </div>
+</div>
+
+<script>
+const TYPE_LABELS = {
+  app_error: 'App errors',
+  order_place_failed: 'Order failures',
+  login_failed: 'Login failures',
+};
+
+function esc(s) {
+  return String(s).replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
+}
+function fmtTime(ts) { try { return new Date(ts).toLocaleString(); } catch { return ts; } }
+function fmtShort(ts) {
+  try { return new Date(ts).toLocaleDateString(undefined, { month:'short', day:'numeric' }) + ' ' +
+        new Date(ts).toLocaleTimeString(undefined, { hour:'2-digit', minute:'2-digit' }); }
+  catch { return ts; }
+}
+
+const state = { offset: 0, limit: 50, dropdownsFilled: false, list: [] };
+
+function qs() {
+  const p = new URLSearchParams();
+  const app = document.getElementById('app-filter').value;
+  const plat = document.getElementById('platform-filter').value;
+  const type = document.getElementById('type-filter').value;
+  const days = document.getElementById('days-filter').value;
+  if (app) p.set('app_slug', app);
+  if (plat) p.set('platform', plat);
+  if (type) p.set('type', type);
+  if (days) p.set('days', days);
+  p.set('limit', state.limit);
+  p.set('offset', state.offset);
+  return p.toString();
+}
+
+async function load() {
+  document.body.classList.add('loading');
+  try {
+    const r = await fetch('/api/errors?' + qs());
+    const d = await r.json();
+    render(d);
+  } catch (e) {
+    document.getElementById('grouped').innerHTML = `<tr><td colspan="6" class="empty">Failed to load: ${esc(e.message)}</td></tr>`;
+  } finally {
+    document.body.classList.remove('loading');
+  }
+}
+
+function fillDropdowns(d) {
+  if (state.dropdownsFilled) return;
+  const app = document.getElementById('app-filter');
+  app.innerHTML = '<option value="">All apps</option>' + (d.apps || []).map(a => `<option value="${esc(a)}">${esc(a)}</option>`).join('');
+  const plat = document.getElementById('platform-filter');
+  plat.innerHTML = '<option value="">All platforms</option>' + (d.platforms || []).map(p => `<option value="${esc(p)}">${esc(p)}</option>`).join('');
+  state.dropdownsFilled = true;
+}
+
+function render(d) {
+  fillDropdowns(d);
+
+  // pills
+  const byType = Object.fromEntries((d.byType || []).map(r => [r.event_type, r.count]));
+  const pills = [`<div class="pill neutral"><b>${(d.total || 0).toLocaleString()}</b><span>total</span></div>`];
+  for (const t of ['app_error', 'order_place_failed', 'login_failed']) {
+    if (byType[t]) pills.push(`<div class="pill"><b>${byType[t].toLocaleString()}</b><span>${TYPE_LABELS[t]}</span></div>`);
+  }
+  document.getElementById('pills').innerHTML = pills.join('');
+
+  // grouped
+  const g = document.getElementById('grouped');
+  if (!d.grouped || d.grouped.length === 0) {
+    g.innerHTML = `<tr><td colspan="6" class="empty">No errors in this window 🎉</td></tr>`;
+  } else {
+    g.innerHTML = d.grouped.map((row, i) => `
+      <tr class="clickable" data-gi="${i}">
+        <td class="sig">${esc(row.signature)}</td>
+        <td><span class="badge badge-${row.event_type}">${row.event_type}</span></td>
+        <td class="num">${row.count.toLocaleString()}</td>
+        <td class="num">${row.appCount}</td>
+        <td class="ts">${fmtShort(row.firstSeen)}</td>
+        <td class="ts">${fmtShort(row.lastSeen)}</td>
+      </tr>
+      <tr class="expand-row" id="exp-${i}" hidden>
+        <td colspan="6">
+          <div class="apps-line">Apps: ${row.apps.map(esc).join(', ')}${row.appCount > row.apps.length ? ` +${row.appCount - row.apps.length} more` : ''}</div>
+          <pre>${esc(JSON.stringify(row.sample, null, 2))}</pre>
+        </td>
+      </tr>
+    `).join('');
+    g.querySelectorAll('tr.clickable').forEach(tr => {
+      tr.addEventListener('click', () => {
+        const row = document.getElementById('exp-' + tr.dataset.gi);
+        row.hidden = !row.hidden;
+      });
+    });
+  }
+  document.getElementById('grouped-hint').textContent =
+    d.groupedFrom >= d.groupScan
+      ? `Grouped from the ${d.groupScan.toLocaleString()} most recent matching errors (there are more — narrow the window or filter for full coverage).`
+      : `Grouped from all ${d.groupedFrom.toLocaleString()} matching errors in this window.`;
+
+  // list
+  state.list = d.list || [];
+  const l = document.getElementById('list');
+  if (state.list.length === 0) {
+    l.innerHTML = `<tr><td colspan="5" class="empty">Nothing here.</td></tr>`;
+  } else {
+    l.innerHTML = state.list.map((e, i) => `
+      <tr class="clickable" data-li="${i}">
+        <td class="ts">${fmtTime(e.timestamp)}</td>
+        <td>${esc(e.app_slug || '')}</td>
+        <td>${esc(e.platform || '')}</td>
+        <td><span class="badge badge-${e.event_type}">${e.event_type}</span></td>
+        <td class="sig">${esc(e.summary)}</td>
+      </tr>
+    `).join('');
+    l.querySelectorAll('tr.clickable').forEach(tr => {
+      tr.addEventListener('click', () => showDetail(state.list[tr.dataset.li]));
+    });
+  }
+
+  const start = d.offset + 1;
+  const end = d.offset + state.list.length;
+  document.getElementById('page-label').textContent =
+    state.list.length ? `${start.toLocaleString()}–${end.toLocaleString()} of ${(d.total || 0).toLocaleString()}` : '—';
+  document.getElementById('prev').disabled = d.offset === 0;
+  document.getElementById('next').disabled = end >= (d.total || 0);
+}
+
+function showDetail(e) {
+  if (!e) return;
+  document.getElementById('modal-title').textContent = e.summary || e.event_type;
+  const fields = [
+    ['Time', fmtTime(e.timestamp)],
+    ['Type', e.event_type],
+    ['App', e.app_slug],
+    ['Platform', e.platform],
+    ['App version', e.app_version],
+    ['OS version', e.os_version],
+  ].filter(([, v]) => v);
+  document.getElementById('modal-detail').innerHTML =
+    fields.map(([k, v]) => `<tr><td>${esc(k)}</td><td>${esc(v)}</td></tr>`).join('');
+  document.getElementById('modal-props').textContent = JSON.stringify(e.properties || {}, null, 2);
+  document.getElementById('modal').classList.add('open');
+}
+function closeDetail() { document.getElementById('modal').classList.remove('open'); }
+document.getElementById('modal-close').addEventListener('click', closeDetail);
+document.getElementById('modal').addEventListener('click', ev => { if (ev.target.id === 'modal') closeDetail(); });
+document.addEventListener('keydown', ev => { if (ev.key === 'Escape') closeDetail(); });
+
+for (const id of ['app-filter', 'platform-filter', 'type-filter', 'days-filter']) {
+  document.getElementById(id).addEventListener('change', () => { state.offset = 0; load(); });
+}
+document.getElementById('prev').addEventListener('click', () => { state.offset = Math.max(0, state.offset - state.limit); load(); });
+document.getElementById('next').addEventListener('click', () => { state.offset += state.limit; load(); });
+
+load();
+</script>
+</body>
+</html>
