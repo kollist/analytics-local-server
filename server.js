@@ -48,9 +48,11 @@ db.pragma('mmap_size = 67108864');      // 64 MB — kept modest so mapped pages
 db.pragma('temp_store = MEMORY');
 db.pragma('journal_size_limit = 67108864'); // cap the WAL at 64 MB after checkpoint
 
-// Keep PRAGMA optimize's analysis bounded so it never turns into a minutes-long
-// full ANALYZE of a mult-GB table at startup.
-db.pragma('analysis_limit = 400');
+// Bound ANALYZE / PRAGMA optimize so they sample rather than scan the whole
+// multi-GB table (SQLite ≥3.32). Big enough to get a usable timestamp
+// histogram so the planner picks the timestamp-led indexes for the windowed
+// dashboard queries.
+db.pragma('analysis_limit = 1000');
 
 // Passive WAL checkpoints get starved when the dashboard is polling constantly,
 // so the WAL can grow into the hundreds of MB. Force a truncating checkpoint
@@ -94,24 +96,39 @@ db.exec(`
 // AFTER the server is already listening (see startup) rather than blocking boot.
 // Every query still works without them — just slower until they finish.
 const DEFERRED_INDEXES = [
-  `CREATE INDEX IF NOT EXISTS idx_type_session ON events(event_type, session_id)`,
-  `CREATE INDEX IF NOT EXISTS idx_timestamp    ON events(timestamp)`,
-  // COUNT(DISTINCT anonymous_id) for "Unique Users" — covering index scan.
-  `CREATE INDEX IF NOT EXISTS idx_anon         ON events(anonymous_id)`,
-  // Per-app leaderboard: GROUP BY app_slug with COUNT(*), COUNT(DISTINCT
-  // session_id / anonymous_id) and purchase counts — all columns in one ordered
-  // index makes it a covering scan. Also serves the per-app funnel steps.
-  `CREATE INDEX IF NOT EXISTS idx_app_cover ON events(app_slug, event_type, session_id, anonymous_id)`,
-  `DROP INDEX IF EXISTS idx_app_type_session`,
-  // Avg-time-per-screen reads screen_name + duration_ms for screen_exited rows.
-  `CREATE INDEX IF NOT EXISTS idx_screenexit ON events(event_type, screen_name, duration_ms)`,
-  // DISTINCT platform for the filter dropdown was a full table scan.
+  // The dashboard is now time-windowed, so almost every query is
+  // `WHERE timestamp >= … [GROUP BY event_type | COUNT DISTINCT session|anon]`.
+  // A timestamp-led covering index turns those into an index range scan.
+  `CREATE INDEX IF NOT EXISTS idx_ts_cover ON events(timestamp, event_type, session_id, anonymous_id)`,
+  // Per-step funnel + windowed pulls of a single event type (checkout health,
+  // top items): seek (event_type, timestamp>=…).
+  `CREATE INDEX IF NOT EXISTS idx_type_ts_session ON events(event_type, timestamp, session_id)`,
+  // "New users" does NOT EXISTS(earlier event for this anon).
+  `CREATE INDEX IF NOT EXISTS idx_anon_ts ON events(anonymous_id, timestamp)`,
+  // Per-app leaderboard: windowed GROUP BY app_slug with COUNT(*) / COUNT(DISTINCT
+  // session_id|anonymous_id) / purchase counts — covering within each app.
+  `CREATE INDEX IF NOT EXISTS idx_app_ts_cover ON events(app_slug, timestamp, event_type, session_id, anonymous_id)`,
+  // Windowed avg-time-per-screen.
+  `CREATE INDEX IF NOT EXISTS idx_screenexit_ts ON events(event_type, timestamp, screen_name, duration_ms)`,
+  // DISTINCT platform for the filter dropdown.
   `CREATE INDEX IF NOT EXISTS idx_platform ON events(platform)`,
+  // Retire the pre-windowing indexes these supersede.
+  `DROP INDEX IF EXISTS idx_app_type_session`,
+  `DROP INDEX IF EXISTS idx_type_session`,
+  `DROP INDEX IF EXISTS idx_timestamp`,
+  `DROP INDEX IF EXISTS idx_anon`,
+  `DROP INDEX IF EXISTS idx_app_cover`,
+  `DROP INDEX IF EXISTS idx_screenexit`,
 ];
 
 function buildDeferredIndexes(i = 0) {
   if (i >= DEFERRED_INDEXES.length) {
-    try { db.pragma('optimize'); } catch {}
+    try {
+      const t0 = Date.now();
+      db.exec('ANALYZE');           // bounded by analysis_limit — samples, doesn't scan
+      db.pragma('optimize');
+      console.log(`   planner stats refreshed (${((Date.now() - t0) / 1000).toFixed(1)}s)`);
+    } catch (e) { console.error('ANALYZE failed:', e.message); }
     indexesReady = true;
     console.log('   dashboard indexes ready');
     warmCaches();
@@ -155,9 +172,43 @@ function broadcast(event) {
 // ── Express ───────────────────────────────────────────────────────────────────
 
 const app = express();
+app.disable('x-powered-by');
+
 // gzip everything — the /api/stats and /api/errors JSON compresses ~5–10x,
 // which matters on a slow mobile connection to the host.
 app.use(compression());
+
+// ── Auth ─────────────────────────────────────────────────────────────────────
+// The dashboard exposes every app's revenue, so it sits behind HTTP basic auth
+// when DASH_USER / DASH_PASS are set (set them in the host's env). Ingest
+// (/api/v1/events) is always open — the mobile apps post to it unauthenticated.
+// With no credentials configured the dashboard is open too, and we shout about
+// it in the logs so a real deploy doesn't stay that way by accident.
+const DASH_USER = process.env.DASH_USER || '';
+const DASH_PASS = process.env.DASH_PASS || '';
+const AUTH_ENABLED = !!(DASH_USER && DASH_PASS);
+
+function timingSafeEqual(a, b) {
+  const bufA = Buffer.from(String(a));
+  const bufB = Buffer.from(String(b));
+  if (bufA.length !== bufB.length) return false;
+  return require('crypto').timingSafeEqual(bufA, bufB);
+}
+
+app.use((req, res, next) => {
+  if (!AUTH_ENABLED) return next();
+  if (req.path === '/api/v1/events') return next(); // ingest stays open for the apps
+
+  const header = req.headers.authorization || '';
+  const [scheme, encoded] = header.split(' ');
+  if (scheme === 'Basic' && encoded) {
+    const [user, pass] = Buffer.from(encoded, 'base64').toString().split(':');
+    if (timingSafeEqual(user, DASH_USER) && timingSafeEqual(pass, DASH_PASS)) return next();
+  }
+  res.set('WWW-Authenticate', 'Basic realm="Analytics", charset="UTF-8"');
+  return res.status(401).send('Authentication required');
+});
+
 app.use(express.json({ limit: '2mb' }));
 app.use(express.static(path.join(__dirname, 'public')));
 
@@ -264,7 +315,7 @@ function askWorker(kind, params) {
 // concurrent first-requests are coalesced onto one job.
 const respCache = new Map(); // key -> { at, epoch, body }
 const pending   = new Map(); // key -> Promise
-const FRESH_MS  = 15000;
+const FRESH_MS  = 30000; // matches the dashboard poll; keeps worker load light
 
 function cacheKey(kind, o) {
   return [kind, o.appSlug || '', o.platform || '', o.days || '', o.type || '', o.limit || '', o.offset || ''].join('|');
@@ -361,7 +412,10 @@ app.listen(PORT, '0.0.0.0', () => {
   console.log(`\n🚀 Analytics local server running`);
   console.log(`   Dashboard: http://localhost:${PORT}`);
   console.log(`   Endpoint:  http://localhost:${PORT}/api/v1/events  (no auth required)`);
-  console.log(`   DB: ${path.join(dbDir, 'analytics.sqlite')}  (journal_mode=${db.pragma('journal_mode', { simple: true })})\n`);
+  console.log(`   DB: ${path.join(dbDir, 'analytics.sqlite')}  (journal_mode=${db.pragma('journal_mode', { simple: true })})`);
+  console.log(AUTH_ENABLED
+    ? `   Auth: dashboard behind HTTP basic auth (user "${DASH_USER}")\n`
+    : `   Auth: ⚠️  DISABLED — set DASH_USER and DASH_PASS to lock the dashboard\n`);
 
   startWorker();
 

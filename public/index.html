@@ -3,146 +3,161 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>Analytics Dashboard</title>
+<title>App Analytics</title>
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
   :root {
-    --bg: #0f1117; --surface: #1a1d27; --border: #2a2d3a;
+    --bg: #0f1117; --surface: #1a1d27; --surface-2: #21242f; --border: #2a2d3a;
     --accent: #6c63ff; --green: #22c55e; --yellow: #f59e0b;
     --red: #ef4444; --text: #e2e8f0; --muted: #64748b;
     --font: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   }
 
   body { background: var(--bg); color: var(--text); font-family: var(--font); font-size: 14px; }
+  a { color: var(--accent); }
 
   header {
     background: var(--surface); border-bottom: 1px solid var(--border);
-    padding: 16px 24px; display: flex; align-items: center; gap: 12px;
+    padding: 14px 24px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+    position: sticky; top: 0; z-index: 50;
   }
-  header h1 { font-size: 18px; font-weight: 700; }
+  header h1 { font-size: 16px; font-weight: 700; margin-right: 4px; }
   .nav-link { color: var(--accent); text-decoration: none; font-size: 13px; font-weight: 600;
-              border: 1px solid var(--border); border-radius: 6px; padding: 4px 10px; }
+              border: 1px solid var(--border); border-radius: 6px; padding: 5px 10px; }
   .nav-link:hover { background: rgba(108,99,255,.12); }
   select {
-    background: var(--surface); color: var(--text); border: 1px solid var(--border);
-    border-radius: 6px; padding: 4px 8px; font-family: inherit; font-size: 13px;
+    background: var(--surface-2); color: var(--text); border: 1px solid var(--border);
+    border-radius: 6px; padding: 5px 8px; font-family: inherit; font-size: 13px;
   }
-  .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--green);
-         animation: pulse 2s infinite; margin-left: auto; }
+  .live { margin-left: auto; display: flex; align-items: center; gap: 6px; }
+  .live-label { font-size: 11px; color: var(--green); font-weight: 600; letter-spacing: .05em; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--green); animation: pulse 2s infinite; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.3} }
 
-  /* top loading bar — visible only while /api/stats is in flight */
   #loadbar {
     position: fixed; top: 0; left: 0; height: 2px; width: 100%;
     background: var(--accent); transform: scaleX(0); transform-origin: left;
     transition: transform .2s ease, opacity .3s ease; opacity: 0; z-index: 300;
   }
-  body.loading #loadbar { transform: scaleX(0.8); opacity: 1; transition: transform 8s ease, opacity .1s; }
-  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.3} }
-  .live-label { font-size: 12px; color: var(--green); }
+  body.loading #loadbar { transform: scaleX(0.85); opacity: 1; transition: transform 12s ease, opacity .1s; }
 
-  .grid { display: grid; grid-template-columns: repeat(6,1fr); gap: 16px; padding: 24px 24px 0; }
+  main { padding: 20px 24px 40px; display: flex; flex-direction: column; gap: 16px; max-width: 1500px; margin: 0 auto; }
+  .section-label { font-size: 11px; text-transform: uppercase; letter-spacing: .09em; color: var(--muted); margin: 6px 2px -4px; }
 
-  .card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 20px; }
-  .card h2 { font-size: 11px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); margin-bottom: 8px; }
-  .card .big { font-size: 32px; font-weight: 700; }
-  .card .sub { font-size: 11px; color: var(--muted); margin-top: 4px; }
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 18px 20px; }
+  .card h2 { font-size: 11px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); margin-bottom: 12px; display: flex; align-items: baseline; gap: 8px; }
+  .card h2 .h2-note { text-transform: none; letter-spacing: 0; color: var(--muted); font-weight: 400; font-size: 11px; }
 
-  .two-col   { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; padding: 16px 24px 0; }
-  .three-col { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; padding: 16px 24px 0; }
-  .full-col  { padding: 16px 24px 24px; }
+  .row { display: grid; gap: 16px; }
+  .kpis   { grid-template-columns: repeat(6, 1fr); }
+  .cols-3 { grid-template-columns: 1fr 1fr 1fr; }
+  .cols-2 { grid-template-columns: 3fr 2fr; }
+  @media (max-width: 1100px) { .kpis { grid-template-columns: repeat(3,1fr); } .cols-3, .cols-2 { grid-template-columns: 1fr; } }
+  @media (max-width: 640px)  { .kpis { grid-template-columns: repeat(2,1fr); } main { padding: 16px 12px 32px; } }
+
+  /* KPI card */
+  .kpi .label { font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+  .kpi .value { font-size: 28px; font-weight: 700; margin-top: 4px; line-height: 1.1; }
+  .kpi .delta { font-size: 11px; margin-top: 6px; display: inline-block; }
+  .kpi .delta .delta-tail { color: var(--muted); }
+  .delta.good { color: var(--green); }
+  .delta.bad  { color: var(--red); }
+  .delta.flat { color: var(--muted); }
 
   table { width: 100%; border-collapse: collapse; font-size: 13px; }
   th { text-align: left; color: var(--muted); font-weight: 600; font-size: 11px;
        text-transform: uppercase; letter-spacing: .06em;
-       border-bottom: 1px solid var(--border); padding: 8px 10px; }
+       border-bottom: 1px solid var(--border); padding: 8px 10px; white-space: nowrap; }
   td { padding: 8px 10px; border-bottom: 1px solid var(--border); }
   tr:last-child td { border-bottom: none; }
-  tr:hover td { background: rgba(255,255,255,.03); }
+  tbody tr:hover td { background: rgba(255,255,255,.03); }
+  .num { text-align: right; font-variant-numeric: tabular-nums; }
 
-  .badge {
-    display: inline-block; padding: 2px 8px; border-radius: 99px;
-    font-size: 11px; font-weight: 600;
-  }
-  .badge-enter  { background: rgba(34,197,94,.15);  color: var(--green); }
-  .badge-exit   { background: rgba(239,68,68,.15);   color: var(--red); }
-  .badge-event  { background: rgba(108,99,255,.15); color: var(--accent); }
-  .badge-login  { background: rgba(245,158,11,.15); color: var(--yellow); }
-  .badge-guest  { background: rgba(100,116,139,.15); color: var(--muted); }
-  .badge-user   { background: rgba(34,197,94,.15);  color: var(--green); }
-  .badge-error  { background: rgba(239,68,68,.15);   color: var(--red); }
+  .badge { display: inline-block; padding: 2px 8px; border-radius: 99px; font-size: 11px; font-weight: 600; }
+  .badge-enter { background: rgba(34,197,94,.15); color: var(--green); }
+  .badge-exit  { background: rgba(239,68,68,.15); color: var(--red); }
+  .badge-event { background: rgba(108,99,255,.15); color: var(--accent); }
+  .badge-login { background: rgba(245,158,11,.15); color: var(--yellow); }
+  .badge-guest { background: rgba(100,116,139,.15); color: var(--muted); }
+  .badge-user  { background: rgba(34,197,94,.15); color: var(--green); }
+  .trend-up   { color: var(--green); }
+  .trend-down { color: var(--red); }
+  .trend-flat { color: var(--muted); }
 
   /* funnel */
-  .funnel { display: flex; flex-direction: column; gap: 10px; }
+  .funnel { display: flex; flex-direction: column; gap: 9px; }
   .funnel-row { display: flex; align-items: center; gap: 10px; }
-  .funnel-label { width: 120px; font-size: 12px; color: var(--muted); flex-shrink: 0; text-align: right; }
-  .funnel-bar-wrap { flex: 1; background: var(--border); border-radius: 4px; height: 22px; overflow: hidden; }
-  .funnel-bar { height: 100%; background: var(--accent); border-radius: 4px; transition: width .6s ease; display: flex; align-items: center; padding-left: 8px; font-size: 12px; font-weight: 600; min-width: 30px; }
-  .funnel-pct { width: 50px; text-align: right; font-size: 12px; color: var(--muted); }
-  .funnel-prev { width: 92px; text-align: right; font-size: 11px; color: var(--muted); flex-shrink: 0; }
+  .funnel-label { width: 110px; font-size: 12px; color: var(--muted); flex-shrink: 0; text-align: right; }
+  .funnel-bar-wrap { flex: 1; background: var(--surface-2); border-radius: 4px; height: 22px; overflow: hidden; }
+  .funnel-bar { height: 100%; background: var(--accent); border-radius: 4px; transition: width .6s ease; display: flex; align-items: center; padding-left: 8px; font-size: 12px; font-weight: 700; min-width: 26px; }
+  .funnel-pct { width: 46px; text-align: right; font-size: 12px; color: var(--muted); }
+  .funnel-prev { width: 118px; text-align: right; font-size: 11px; color: var(--muted); flex-shrink: 0; }
   .funnel-prev b { color: var(--text); font-weight: 600; }
-  .funnel-head { display: flex; gap: 10px; margin-bottom: 2px; }
-  .funnel-head .funnel-label, .funnel-head .funnel-pct, .funnel-head .funnel-prev { font-size: 10px; text-transform: uppercase; letter-spacing: .06em; }
-  .funnel-head .funnel-bar-wrap { visibility: hidden; height: 0; }
+  .funnel-prev .drop { color: var(--red); }
+  .funnel-head .funnel-label, .funnel-head .funnel-pct, .funnel-head .funnel-prev { font-size: 10px; text-transform: uppercase; letter-spacing: .05em; }
 
-  /* live feed */
-  #feed { max-height: 380px; overflow-y: auto; }
-  #feed tr { animation: fadeIn .3s ease; }
-  @keyframes fadeIn { from{opacity:0; transform:translateY(-4px)} to{opacity:1; transform:none} }
-  .ts { color: var(--muted); font-size: 11px; }
-  .props { color: var(--muted); font-size: 11px; max-width: 280px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  /* checkout health mini-grid */
+  .mini-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 14px 18px; }
+  @media (max-width: 640px) { .mini-grid { grid-template-columns: 1fr 1fr; } }
+  .mini .m-val { font-size: 20px; font-weight: 700; }
+  .mini .m-lab { font-size: 11px; color: var(--muted); margin-top: 2px; }
+  .mini .m-sub { font-size: 11px; color: var(--muted); margin-top: 1px; }
+  .splitbar { display: flex; height: 8px; border-radius: 4px; overflow: hidden; margin-top: 6px; background: var(--surface-2); }
+  .splitbar > span { display: block; }
+  .legend { display: flex; gap: 14px; flex-wrap: wrap; margin-top: 6px; font-size: 11px; color: var(--muted); }
+  .legend i { display: inline-block; width: 8px; height: 8px; border-radius: 2px; margin-right: 4px; vertical-align: middle; }
+  .paymix { display: flex; flex-direction: column; gap: 4px; margin-top: 4px; }
+  .paymix-row { display: flex; justify-content: space-between; font-size: 12px; }
+  .paymix-row span:last-child { color: var(--muted); }
 
-  ::-webkit-scrollbar { width: 6px; height: 6px; }
-  ::-webkit-scrollbar-track { background: transparent; }
-  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+  /* leaderboard */
+  .tabs { display: flex; gap: 6px; }
+  .tab { background: var(--surface-2); color: var(--muted); border: 1px solid var(--border);
+         border-radius: 6px; padding: 4px 10px; font: inherit; font-size: 12px; font-weight: 600; cursor: pointer; }
+  .tab.active { color: var(--text); border-color: var(--accent); background: rgba(108,99,255,.12); }
+  #lb th { cursor: pointer; user-select: none; }
+  #lb th.sorted { color: var(--text); }
+  #lb tr.lb-row { cursor: pointer; }
+  #lb td.lb-best { color: var(--green); font-weight: 700; }
+  #lb .lb-rank { color: var(--muted); font-size: 11px; margin-right: 6px; }
+  .lb-toggle { margin-top: 12px; background: var(--surface-2); color: var(--accent);
+    border: 1px solid var(--border); border-radius: 6px; padding: 6px 12px; font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; }
+  .lb-toggle:hover { background: rgba(108,99,255,.12); }
 
-  #feed tr { cursor: pointer; }
-
-  /* event detail modal */
-  .modal-overlay {
-    display: none; position: fixed; inset: 0; background: rgba(0,0,0,.5);
-    align-items: center; justify-content: center; z-index: 100;
+  /* details section */
+  details.detail-block { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 0 20px; }
+  details.detail-block > summary {
+    list-style: none; cursor: pointer; padding: 16px 0; font-size: 11px;
+    text-transform: uppercase; letter-spacing: .08em; color: var(--muted); font-weight: 600;
   }
-  .modal-overlay.open { display: flex; }
-  .modal {
-    background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
-    width: 560px; max-width: 90vw; max-height: 85vh; overflow-y: auto;
-    padding: 24px;
-  }
-  .modal-header { display: flex; align-items: center; gap: 10px; margin-bottom: 16px; }
-  .modal-header h3 { font-size: 16px; font-weight: 700; flex: 1; }
-  .modal-close {
-    background: none; border: none; color: var(--muted); font-size: 20px;
-    cursor: pointer; line-height: 1; padding: 4px;
-  }
-  .modal-close:hover { color: var(--text); }
-  .detail-table { width: 100%; border-collapse: collapse; font-size: 13px; margin-bottom: 16px; }
-  .detail-table tr td { padding: 6px 10px; border-bottom: 1px solid var(--border); vertical-align: top; }
-  .detail-table tr:last-child td { border-bottom: none; }
-  .detail-table td:first-child {
-    color: var(--muted); font-weight: 600; white-space: nowrap; width: 130px;
-  }
-  .detail-table td:last-child { word-break: break-word; }
-  .modal h4 { font-size: 11px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); margin-bottom: 8px; }
-  .props-empty { color: var(--muted); font-style: italic; font-size: 13px; }
+  details.detail-block > summary::-webkit-details-marker { display: none; }
+  details.detail-block > summary::before { content: '▸ '; color: var(--muted); }
+  details.detail-block[open] > summary::before { content: '▾ '; }
+  .detail-inner { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; padding-bottom: 20px; }
+  @media (max-width: 900px) { .detail-inner { grid-template-columns: 1fr; } }
+  .detail-inner h3 { font-size: 11px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); margin-bottom: 8px; }
 
-  /* grouped events-by-type */
   .grp-header td { cursor: pointer; font-weight: 700; color: var(--text); background: rgba(255,255,255,.025); user-select: none; }
   .grp-header:hover td { background: rgba(255,255,255,.05); }
   .grp-caret { display: inline-block; width: 12px; color: var(--muted); transition: transform .15s ease; font-size: 10px; }
   .grp-header.open .grp-caret { transform: rotate(90deg); }
   .grp-count { color: var(--muted); font-weight: 600; }
+  .insight-list { display: flex; flex-direction: column; gap: 12px; margin-top: 4px; }
+  .insight { display: flex; gap: 10px; align-items: flex-start; }
+  .insight .ic { font-size: 14px; flex-shrink: 0; }
+  .insight .body { color: var(--muted); font-size: 13px; line-height: 1.55; }
+  .insight .body b { color: var(--text); }
 
   /* trend charts */
   .chart-wrap svg { display: block; }
-  .chart-total { font-size: 20px; font-weight: 700; margin-bottom: 2px; }
-  .chart-total .unit { font-size: 12px; color: var(--muted); font-weight: 600; margin-left: 4px; }
+  .chart-total { font-size: 18px; font-weight: 700; margin-bottom: 2px; }
+  .chart-total .unit { font-size: 11px; color: var(--muted); font-weight: 600; margin-left: 4px; }
   .bar-col { cursor: pointer; }
   .bar-col .bar-visible { transition: filter .1s ease; }
   .bar-col:hover .bar-visible { filter: brightness(1.3); }
   .line-overlay { cursor: crosshair; }
   .line-dot { transition: r .1s ease; }
-
   .chart-tooltip {
     position: fixed; display: none; z-index: 200; pointer-events: none;
     background: var(--surface); border: 1px solid var(--border); border-radius: 8px;
@@ -151,26 +166,29 @@
   .chart-tooltip .tt-label { color: var(--muted); margin-bottom: 2px; }
   .chart-tooltip .tt-value { font-weight: 700; font-size: 14px; }
 
-  /* drop-off guide */
-  .insight-list { display: flex; flex-direction: column; gap: 14px; }
-  .insight { display: flex; gap: 10px; align-items: flex-start; }
-  .insight .ic { font-size: 15px; line-height: 1.4; flex-shrink: 0; }
-  .insight .body b { color: var(--text); }
-  .insight .body { color: var(--muted); font-size: 13px; line-height: 1.6; }
+  /* live feed */
+  #feed-wrap { max-height: 360px; overflow-y: auto; }
+  #feed tr { animation: fadeIn .3s ease; cursor: pointer; }
+  @keyframes fadeIn { from{opacity:0; transform:translateY(-4px)} to{opacity:1; transform:none} }
+  .ts { color: var(--muted); font-size: 11px; }
+  .props { color: var(--muted); font-size: 11px; max-width: 280px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
-  /* app leaderboard */
-  #leaderboard th { cursor: pointer; user-select: none; white-space: nowrap; }
-  #leaderboard th.sorted { color: var(--text); }
-  #leaderboard td.num, #leaderboard th.num { text-align: right; }
-  #leaderboard tr.lb-row { cursor: pointer; }
-  #leaderboard td.lb-best { color: var(--green); font-weight: 700; }
-  #leaderboard .lb-rank { color: var(--muted); font-size: 11px; margin-right: 6px; }
-  .lb-toggle {
-    margin-top: 12px; background: var(--surface); color: var(--accent);
-    border: 1px solid var(--border); border-radius: 6px; padding: 6px 12px;
-    font-family: inherit; font-size: 13px; font-weight: 600; cursor: pointer;
-  }
-  .lb-toggle:hover { background: rgba(108,99,255,.12); }
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+  /* modal */
+  .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.5); align-items: center; justify-content: center; z-index: 100; }
+  .modal-overlay.open { display: flex; }
+  .modal { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; width: 560px; max-width: 90vw; max-height: 85vh; overflow-y: auto; padding: 24px; }
+  .modal-header { display: flex; align-items: center; gap: 10px; margin-bottom: 16px; }
+  .modal-header h3 { font-size: 16px; font-weight: 700; flex: 1; }
+  .modal-close { background: none; border: none; color: var(--muted); font-size: 20px; cursor: pointer; }
+  .detail-table { width: 100%; border-collapse: collapse; font-size: 13px; margin-bottom: 16px; }
+  .detail-table td { padding: 6px 10px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  .detail-table td:first-child { color: var(--muted); font-weight: 600; white-space: nowrap; width: 130px; }
+  .detail-table td:last-child { word-break: break-word; }
+  .modal h4 { font-size: 11px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); margin-bottom: 8px; }
+  .props-empty { color: var(--muted); font-style: italic; }
 </style>
 </head>
 <body>
@@ -178,144 +196,127 @@
 <div id="loadbar"></div>
 
 <header>
-  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#6c63ff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#6c63ff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
     <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
   </svg>
-  <h1>Analytics · Local Dev</h1>
-  <select id="app-filter">
-    <option value="">All apps</option>
-  </select>
-  <select id="platform-filter">
-    <option value="">All platforms</option>
-  </select>
+  <h1>App Analytics</h1>
+  <select id="app-filter"><option value="">All apps</option></select>
+  <select id="platform-filter"><option value="">All platforms</option></select>
   <select id="days-filter">
     <option value="7">Last 7 days</option>
     <option value="14" selected>Last 14 days</option>
     <option value="30">Last 30 days</option>
     <option value="90">Last 90 days</option>
   </select>
-  <a class="nav-link" href="/errors.html">Errors →</a>
-  <div class="live-label">LIVE</div>
-  <div class="dot"></div>
+  <a class="nav-link" href="/errors.html">Errors &rarr;</a>
+  <div class="live"><span class="live-label">LIVE</span><span class="dot"></span></div>
 </header>
 
-<!-- KPI row -->
-<div class="grid">
-  <div class="card"><h2>Total Events</h2><div class="big" id="kpi-total">—</div></div>
-  <div class="card"><h2>Sessions</h2><div class="big" id="kpi-sessions">—</div></div>
-  <div class="card"><h2>Unique Users</h2><div class="big" id="kpi-users">—</div></div>
-  <div class="card"><h2>Conversion Rate</h2><div class="big" id="kpi-conversion">—</div></div>
-  <div class="card"><h2>Revenue</h2><div class="big" id="kpi-revenue">—</div></div>
-  <div class="card"><h2>Avg Order Value</h2><div class="big" id="kpi-aov">—</div></div>
-</div>
+<main>
+  <div class="section-label" id="window-label">Last 14 days · all apps</div>
 
-<!-- Trend charts -->
-<div class="three-col">
-  <div class="card">
-    <h2>Sessions / day</h2>
-    <div class="chart-wrap" id="chart-sessions"></div>
+  <!-- KPI strip -->
+  <div class="row kpis">
+    <div class="card kpi"><div class="label">Orders</div><div class="value" id="k-orders">—</div><div id="k-orders-d"></div></div>
+    <div class="card kpi"><div class="label">GMV</div><div class="value" id="k-gmv">—</div><div id="k-gmv-d"></div></div>
+    <div class="card kpi"><div class="label">Conversion</div><div class="value" id="k-conv">—</div><div id="k-conv-d"></div></div>
+    <div class="card kpi"><div class="label">Avg Order Value</div><div class="value" id="k-aov">—</div><div id="k-aov-d"></div></div>
+    <div class="card kpi"><div class="label">Crash-free sessions</div><div class="value" id="k-crash">—</div><div id="k-crash-d"></div></div>
+    <div class="card kpi"><div class="label">New users</div><div class="value" id="k-new">—</div><div id="k-new-d"></div></div>
   </div>
-  <div class="card">
-    <h2>Conversion rate / day</h2>
-    <div class="chart-wrap" id="chart-conversion"></div>
-  </div>
-  <div class="card">
-    <h2>Revenue / day</h2>
-    <div class="chart-wrap" id="chart-revenue"></div>
-  </div>
-</div>
 
-<!-- App leaderboard -->
-<div class="full-col">
+  <!-- Trends -->
+  <div class="row cols-3">
+    <div class="card"><h2>Orders / day</h2><div class="chart-wrap" id="chart-orders"></div></div>
+    <div class="card"><h2>Conversion / day</h2><div class="chart-wrap" id="chart-conv"></div></div>
+    <div class="card"><h2>GMV / day</h2><div class="chart-wrap" id="chart-gmv"></div></div>
+  </div>
+
+  <!-- Leaderboard -->
   <div class="card">
-    <h2>App Leaderboard <span style="text-transform:none;letter-spacing:0;color:var(--muted)">— all time, click a column to sort, click a row to filter</span></h2>
-    <br/>
-    <table id="leaderboard">
+    <h2>
+      App Leaderboard
+      <span class="h2-note">click a column to sort · click a row to filter</span>
+      <span style="margin-left:auto"></span>
+      <span class="tabs" id="lb-tabs">
+        <button class="tab active" data-view="top">Top performers</button>
+        <button class="tab" data-view="under">Underperformers</button>
+      </span>
+    </h2>
+    <table id="lb">
       <thead>
         <tr>
           <th data-sort="app_slug">App</th>
-          <th class="num" data-sort="sessions">Sessions</th>
-          <th class="num" data-sort="users">Users</th>
           <th class="num" data-sort="orders">Orders</th>
+          <th class="num" data-sort="gmv">GMV</th>
           <th class="num" data-sort="conversionRate">Conv %</th>
-          <th class="num" data-sort="revenue">Revenue</th>
           <th class="num" data-sort="aov">AOV</th>
+          <th class="num" data-sort="users">Users</th>
         </tr>
       </thead>
-      <tbody id="leaderboard-body"></tbody>
+      <tbody id="lb-body"></tbody>
     </table>
     <button class="lb-toggle" id="lb-toggle" hidden></button>
   </div>
-</div>
 
-<!-- Funnel + event types -->
-<div class="two-col">
-  <div class="card">
-    <h2>Ordering Funnel</h2>
-    <br/>
-    <div class="funnel-head funnel-row">
-      <div class="funnel-label">Step</div>
-      <div class="funnel-bar-wrap"></div>
-      <div class="funnel-pct">Of top</div>
-      <div class="funnel-prev">Of previous</div>
+  <!-- Funnel + Checkout health -->
+  <div class="row cols-2">
+    <div class="card">
+      <h2>Ordering Funnel <span class="h2-note">unique sessions per step</span></h2>
+      <div class="funnel-row funnel-head">
+        <div class="funnel-label">Step</div>
+        <div class="funnel-bar-wrap" style="visibility:hidden;height:0"></div>
+        <div class="funnel-pct">Of top</div>
+        <div class="funnel-prev">Step conversion</div>
+      </div>
+      <div class="funnel" id="funnel"></div>
     </div>
-    <div class="funnel" id="funnel"></div>
+    <div class="card">
+      <h2>Checkout Health</h2>
+      <div class="mini-grid" id="checkout"></div>
+    </div>
   </div>
+
+  <!-- Top items -->
   <div class="card">
-    <h2>Events by Type</h2>
-    <br/>
+    <h2>Top Items <span class="h2-note">by add-to-cart in the selected window</span></h2>
     <table>
-      <thead><tr><th>Type</th><th>Count</th></tr></thead>
-      <tbody id="event-types"></tbody>
+      <thead><tr><th>Item</th><th class="num">Add-to-carts</th><th class="num">Sessions</th><th class="num">Avg price</th></tr></thead>
+      <tbody id="top-items"></tbody>
     </table>
   </div>
-</div>
 
-<!-- Screen time -->
-<div class="full-col">
-  <div class="card">
-    <h2>Avg Time per Screen (seconds)</h2>
-    <br/>
-    <table>
-      <thead><tr><th>Screen</th><th>Avg s</th><th>Views</th></tr></thead>
-      <tbody id="screen-time"></tbody>
-    </table>
-  </div>
-</div>
+  <!-- Details (collapsed) -->
+  <details class="detail-block">
+    <summary>Detail — event volume, screen time, drop-off notes</summary>
+    <div class="detail-inner">
+      <div>
+        <h3>Events by type</h3>
+        <table><tbody id="event-types"></tbody></table>
+      </div>
+      <div>
+        <h3>Avg time per screen (seconds, outliers capped)</h3>
+        <table><thead><tr><th>Screen</th><th class="num">Avg s</th><th class="num">Views</th></tr></thead><tbody id="screen-time"></tbody></table>
+        <h3 style="margin-top:20px">Notes</h3>
+        <div class="insight-list" id="insights"></div>
+      </div>
+    </div>
+  </details>
 
-<!-- Drop-off guide -->
-<div class="full-col">
-  <div class="card">
-    <h2>Drop-off Guide</h2>
-    <br/>
-    <div class="insight-list" id="insights"></div>
-  </div>
-</div>
-
-<!-- Live feed -->
-<div class="full-col">
+  <!-- Live feed -->
   <div class="card">
     <h2>Live Event Feed</h2>
-    <br/>
-    <table>
-      <thead>
-        <tr>
-          <th>Time</th><th>App</th><th>Type</th><th>Screen</th>
-          <th>Duration</th><th>User</th><th>Properties</th>
-        </tr>
-      </thead>
-      <tbody id="feed"></tbody>
-    </table>
+    <div id="feed-wrap">
+      <table>
+        <thead><tr><th>Time</th><th>App</th><th>Type</th><th>Screen</th><th>Duration</th><th>User</th><th>Properties</th></tr></thead>
+        <tbody id="feed"></tbody>
+      </table>
+    </div>
   </div>
-</div>
+</main>
 
-<!-- Trend chart tooltip (shared by all three charts) -->
-<div class="chart-tooltip" id="chart-tooltip">
-  <div class="tt-label"></div>
-  <div class="tt-value"></div>
-</div>
+<div class="chart-tooltip" id="chart-tooltip"><div class="tt-label"></div><div class="tt-value"></div></div>
 
-<!-- Event detail modal -->
 <div class="modal-overlay" id="event-modal">
   <div class="modal">
     <div class="modal-header">
@@ -329,628 +330,499 @@
 </div>
 
 <script>
-// Event-based ordering funnel: each step is an action event (see server.js FUNNEL_STEPS).
-const FUNNEL_ORDER  = ['view_item_list','view_item','add_to_cart','begin_checkout','place_order_tapped','purchase'];
-const FUNNEL_LABELS = {
-  view_item_list:     'Browse menu',
-  view_item:          'View item',
-  add_to_cart:        'Add to cart',
-  begin_checkout:     'Begin checkout',
-  place_order_tapped: 'Place order',
-  purchase:           'Purchase',
-};
-
-// Event categories for the "Events by Type" panel. Anything not listed falls into "Other".
-const EVENT_GROUPS = [
-  ['Discovery',     ['browse_menu','view_item_list','view_item','search','search_results','search_result_click']],
-  ['Cart',          ['add_to_cart','item_added_to_cart','remove_from_cart','cart_item_qty_changed','item_qty_changed','view_cart']],
-  ['Checkout',      ['begin_checkout','order_type_selected','order_time_selected','delivery_address_selected','delivery_map_opened',
-                     'payment_method_selected','new_card_form_opened','new_card_submitted','coupon_applied','coupon_cleared',
-                     'coupon_selected_from_list','loyalty_points_applied','loyalty_suggestion_selected','loyalty_cleared','tip_selected',
-                     'special_instructions_entered','contact_info_edited','phone_verification_sent','phone_verified',
-                     'discount_item_selected','place_order_tapped']],
-  ['Order outcome', ['order_placed','purchase','checkout_abandoned','track_order','view_receipt','order_again']],
-  ['Engagement',    ['home_refreshed','story_clicked','featured_item_clicked','article_clicked','event_clicked','event_buy_clicked',
-                     'reward_clicked','ticket_qr_viewed','location_selected','location_directions','view_notification']],
-  ['Auth',          ['sign_up','login_attempt','login_success']],
-  ['System',        ['session_start','session_end','screen_entered','screen_exited']],
-];
-const GROUP_OF = {};
-for (const [g, evs] of EVENT_GROUPS) for (const e of evs) GROUP_OF[e] = g;
-const GROUP_ORDER = EVENT_GROUPS.map(g => g[0]).concat('Other');
-
-// Error / failure events get their own panel instead of mixing into the list above.
-const ERROR_EVENTS = new Set(['app_error', 'order_place_failed', 'login_failed']);
-const openGroups = new Set(); // persisted expand/collapse state across refreshes
-
-function renderEventTypes(byType) {
-  const groups = {};
-  for (const name of GROUP_ORDER) groups[name] = { total: 0, rows: [] };
-  for (const r of byType) {
-    if (ERROR_EVENTS.has(r.event_type)) continue; // shown in the Errors panel
-    const g = GROUP_OF[r.event_type] || 'Other';
-    groups[g].total += r.count;
-    groups[g].rows.push(r);
-  }
-  let html = '';
-  for (const name of GROUP_ORDER) {
-    const grp = groups[name];
-    if (grp.rows.length === 0) continue;
-    const isOpen = openGroups.has(name);
-    grp.rows.sort((a, b) => b.count - a.count);
-    const sel = name.replace(/"/g, '&quot;');
-    html += `<tr class="grp-header${isOpen ? ' open' : ''}" data-group="${sel}" onclick="toggleGroup('${name.replace(/'/g, "\\'")}')">
-      <td><span class="grp-caret">&#9654;</span> ${name} <span class="grp-count">(${grp.rows.length})</span></td>
-      <td class="grp-count">${grp.total.toLocaleString()}</td></tr>`;
-    for (const r of grp.rows) {
-      html += `<tr class="grp-child" data-group="${sel}" style="display:${isOpen ? 'table-row' : 'none'}">
-        <td style="padding-left:28px">${badge(r.event_type)}</td>
-        <td>${r.count.toLocaleString()}</td></tr>`;
-    }
-  }
-  document.getElementById('event-types').innerHTML = html;
+// ── Formatting ──────────────────────────────────────────────────────────────
+function escapeHtml(str) {
+  return String(str).replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
 }
-
-function toggleGroup(name) {
-  const isOpen = openGroups.has(name);
-  if (isOpen) openGroups.delete(name); else openGroups.add(name);
-  const esc = (window.CSS && CSS.escape) ? CSS.escape(name) : name.replace(/"/g, '\\"');
-  const header = document.querySelector(`#event-types tr.grp-header[data-group="${esc}"]`);
-  if (header) header.classList.toggle('open', !isOpen);
-  document.querySelectorAll(`#event-types tr.grp-child[data-group="${esc}"]`)
-    .forEach(tr => { tr.style.display = isOpen ? 'none' : 'table-row'; });
+function fmtInt(n) { return Math.round(n || 0).toLocaleString(); }
+function fmtNum(n) {
+  n = n || 0;
+  if (Math.abs(n) >= 1e6) return (n / 1e6).toFixed(n % 1e6 === 0 ? 0 : 1) + 'M';
+  if (Math.abs(n) >= 1e4) return (n / 1e3).toFixed(0) + 'k';
+  return Math.round(n).toLocaleString();
 }
-
-function badge(type) {
-  if (type === 'screen_entered') return `<span class="badge badge-enter">enter</span>`;
-  if (type === 'screen_exited')  return `<span class="badge badge-exit">exit</span>`;
-  if (type.includes('login') || type.includes('signup')) return `<span class="badge badge-login">${type}</span>`;
-  return `<span class="badge badge-event">${type}</span>`;
-}
-
-function fmt(ts) {
-  try { return new Date(ts).toLocaleTimeString(); } catch { return ts; }
-}
-
 function fmtMoney(n) {
-  return '$' + (n || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  n = n || 0;
+  if (Math.abs(n) >= 1e6) return '$' + (n / 1e6).toFixed(2) + 'M';
+  if (Math.abs(n) >= 1e4) return '$' + (n / 1e3).toFixed(1) + 'k';
+  return '$' + n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
-
+function fmtMoneyFull(n) { return '$' + (n || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+function fmtPct(n, dp = 1) { return `${(n || 0).toFixed(dp)}%`; }
+function fmt(ts) { try { return new Date(ts).toLocaleTimeString(); } catch { return ts; } }
 function fmtDay(day) {
-  // "2026-07-21" -> "Jul 21"
   const d = new Date(day + 'T00:00:00Z');
   return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', timeZone: 'UTC' });
 }
+function labelize(k) { return String(k).replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()); }
 
-// ── Trend charts (hand-rolled SVG — no chart library, matches the dashboard's
-// own tokens: one hue per chart, thin marks, a real floating tooltip) ─────────
-// Native SVG <title> was tried first but needs a ~1s hover hold and only
-// triggers over the painted pixels, which is why bars barely register on
-// hover. Real fix: an HTML tooltip driven by pointermove, with a hit target
-// that's the full column (bars) or a nearest-point crosshair (line).
-
-function escapeHtml(str) {
-  return String(str).replace(/[&<>"']/g, c => ({
-    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
-  }[c]));
+// delta: mode 'rel' (relative %) or 'pp' (percentage points). goodUp = is an increase good?
+function deltaHTML(cur, prev, mode, goodUp = true) {
+  let d, txt;
+  if (mode === 'pp') {
+    d = (cur || 0) - (prev || 0);
+    txt = `${d >= 0 ? '▲' : '▼'} ${Math.abs(d).toFixed(1)}pp`;
+  } else {
+    if (!prev) return `<span class="delta flat">new</span>`;
+    d = ((cur - prev) / prev) * 100;
+    txt = `${d >= 0 ? '▲' : '▼'} ${Math.abs(d).toFixed(0)}%`;
+  }
+  const cls = Math.abs(d) < 1e-9 ? 'flat' : ((d >= 0) === goodUp ? 'good' : 'bad');
+  return `<span class="delta ${cls}">${txt}<span class="delta-tail"> vs prev ${currentDays()}d</span></span>`;
 }
 
-const CHART = { width: 400, height: 130 };
-
-function chartTooltip() {
-  return document.getElementById('chart-tooltip');
-}
-
-function showChartTooltip(clientX, clientY, label, value, color) {
+// ── Trend charts (hand-rolled SVG) ─────────────────────────────────────────
+const CHART = { width: 400, height: 120 };
+function chartTooltip() { return document.getElementById('chart-tooltip'); }
+function showChartTooltip(x, y, label, value, color) {
   const el = chartTooltip();
   el.querySelector('.tt-label').textContent = label;
   el.querySelector('.tt-value').textContent = value;
   el.querySelector('.tt-value').style.color = color;
   el.style.display = 'block';
-  // Clamp so the tooltip never runs off the right edge of the viewport.
-  const ttWidth = el.offsetWidth || 140;
-  const x = Math.min(clientX + 14, window.innerWidth - ttWidth - 8);
-  el.style.left = `${x}px`;
-  el.style.top = `${clientY - 12}px`;
+  const w = el.offsetWidth || 140;
+  el.style.left = `${Math.min(x + 14, window.innerWidth - w - 8)}px`;
+  el.style.top = `${y - 12}px`;
 }
+function hideChartTooltip() { chartTooltip().style.display = 'none'; }
 
-function hideChartTooltip() {
-  chartTooltip().style.display = 'none';
-}
-
-function barChart(data, { color, valueFmt, id }) {
+function barChart(data, { color, id }) {
   const { width, height } = CHART;
   const pad = { top: 10, right: 6, bottom: 18, left: 6 };
-  const innerW = width - pad.left - pad.right;
-  const innerH = height - pad.top - pad.bottom;
+  const innerW = width - pad.left - pad.right, innerH = height - pad.top - pad.bottom;
   const max = Math.max(...data.map(d => d.value), 1);
-  const barW = innerW / data.length;
-  const gap = Math.min(6, barW * 0.3);
-
+  const barW = innerW / data.length, gap = Math.min(6, barW * 0.3);
   let cols = '';
   data.forEach((d, i) => {
     const h = max > 0 ? (d.value / max) * innerH : 0;
-    const colX = pad.left + i * barW;
-    const barX = colX + gap / 2;
-    const barW2 = Math.max(barW - gap, 1);
-    const y = pad.top + (innerH - h);
-    // The hit rect spans the FULL column (not just the painted bar) so the
-    // reader doesn't have to land on a thin sliver to get a value.
+    const colX = pad.left + i * barW, y = pad.top + (innerH - h);
     cols += `<g class="bar-col" data-day="${escapeHtml(d.day)}" data-value="${d.value}">
-      <rect class="bar-hit" x="${colX.toFixed(1)}" y="${pad.top}" width="${barW.toFixed(1)}" height="${innerH}" fill="transparent"/>
-      <rect class="bar-visible" x="${barX.toFixed(1)}" y="${y.toFixed(1)}" width="${barW2.toFixed(1)}" height="${Math.max(h, 1).toFixed(1)}" rx="2.5" fill="${color}"/>
-    </g>`;
+      <rect x="${colX.toFixed(1)}" y="${pad.top}" width="${barW.toFixed(1)}" height="${innerH}" fill="transparent"/>
+      <rect class="bar-visible" x="${(colX + gap/2).toFixed(1)}" y="${y.toFixed(1)}" width="${Math.max(barW-gap,1).toFixed(1)}" height="${Math.max(h,1).toFixed(1)}" rx="2.5" fill="${color}"/></g>`;
   });
-  const baseline = `<line x1="${pad.left}" y1="${pad.top + innerH}" x2="${width - pad.right}" y2="${pad.top + innerH}" stroke="var(--border)" stroke-width="1"/>`;
-  const labels = data.length > 0 ? `
-    <text x="${pad.left}" y="${height - 4}" font-size="10" fill="var(--muted)">${escapeHtml(fmtDay(data[0].day))}</text>
-    <text x="${width - pad.right}" y="${height - 4}" font-size="10" fill="var(--muted)" text-anchor="end">${escapeHtml(fmtDay(data[data.length - 1].day))}</text>` : '';
-  return `<svg id="${id}" viewBox="0 0 ${width} ${height}" width="100%" height="${height}" preserveAspectRatio="none">${baseline}${cols}${labels}</svg>`;
+  const base = `<line x1="${pad.left}" y1="${pad.top+innerH}" x2="${width-pad.right}" y2="${pad.top+innerH}" stroke="var(--border)"/>`;
+  const lbl = data.length ? `<text x="${pad.left}" y="${height-4}" font-size="10" fill="var(--muted)">${escapeHtml(fmtDay(data[0].day))}</text>
+    <text x="${width-pad.right}" y="${height-4}" font-size="10" fill="var(--muted)" text-anchor="end">${escapeHtml(fmtDay(data[data.length-1].day))}</text>` : '';
+  return `<svg id="${id}" viewBox="0 0 ${width} ${height}" width="100%" height="${height}" preserveAspectRatio="none">${base}${cols}${lbl}</svg>`;
 }
-
-function wireBarChart(containerId, color, valueFmt) {
-  const svg = document.getElementById(containerId);
-  if (!svg) return;
+function wireBar(id, color, vfmt) {
+  const svg = document.getElementById(id); if (!svg) return;
   svg.querySelectorAll('.bar-col').forEach(col => {
-    col.addEventListener('pointermove', (ev) => {
-      const { day, value } = col.dataset;
-      showChartTooltip(ev.clientX, ev.clientY, fmtDay(day), valueFmt(Number(value)), color);
-    });
+    col.addEventListener('pointermove', ev => showChartTooltip(ev.clientX, ev.clientY, fmtDay(col.dataset.day), vfmt(Number(col.dataset.value)), color));
     col.addEventListener('pointerleave', hideChartTooltip);
   });
 }
-
-function lineChart(data, { color, max, valueFmt, id }) {
+function lineChart(data, { color, max, id }) {
   const { width, height } = CHART;
   const pad = { top: 14, right: 6, bottom: 18, left: 6 };
-  const innerW = width - pad.left - pad.right;
-  const innerH = height - pad.top - pad.bottom;
+  const innerW = width - pad.left - pad.right, innerH = height - pad.top - pad.bottom;
   const scaleMax = max ?? Math.max(...data.map(d => d.value), 1);
-  const n = data.length;
-  const stepX = n > 1 ? innerW / (n - 1) : 0;
-
-  const points = data.map((d, i) => ({
-    x: pad.left + i * stepX,
-    y: pad.top + innerH - (scaleMax > 0 ? Math.min(d.value, scaleMax) / scaleMax : 0) * innerH,
-    d,
-  }));
-  const path = points.map((p, i) => `${i === 0 ? 'M' : 'L'}${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ');
-  const dots = points.map((p, i) =>
-    `<circle class="line-dot" data-i="${i}" cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="3" fill="${color}"/>`
-  ).join('');
-  const baseline = `<line x1="${pad.left}" y1="${pad.top + innerH}" x2="${width - pad.right}" y2="${pad.top + innerH}" stroke="var(--border)" stroke-width="1"/>`;
-  const labels = data.length > 0 ? `
-    <text x="${pad.left}" y="${height - 4}" font-size="10" fill="var(--muted)">${escapeHtml(fmtDay(data[0].day))}</text>
-    <text x="${width - pad.right}" y="${height - 4}" font-size="10" fill="var(--muted)" text-anchor="end">${escapeHtml(fmtDay(data[data.length - 1].day))}</text>` : '';
-  // Crosshair (hidden until hover) + a full-area transparent overlay that
-  // tracks the pointer and snaps to the nearest data position.
-  const crosshair = `<line id="${id}-crosshair" x1="0" y1="${pad.top}" x2="0" y2="${pad.top + innerH}" stroke="${color}" stroke-width="1" stroke-dasharray="2,2" opacity="0" pointer-events="none"/>`;
-  const overlay = `<rect id="${id}-overlay" class="line-overlay" x="${pad.left}" y="0" width="${innerW}" height="${height}" fill="transparent"/>`;
-  return {
-    svg: `<svg id="${id}" viewBox="0 0 ${width} ${height}" width="100%" height="${height}" preserveAspectRatio="none">${baseline}<path d="${path}" fill="none" stroke="${color}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>${dots}${crosshair}${overlay}</svg>`,
-    points, pad, stepX,
-  };
+  const n = data.length, stepX = n > 1 ? innerW / (n - 1) : 0;
+  const pts = data.map((d, i) => ({ x: pad.left + i*stepX, y: pad.top + innerH - (scaleMax>0 ? Math.min(d.value,scaleMax)/scaleMax : 0)*innerH, d }));
+  const path = pts.map((p, i) => `${i?'L':'M'}${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ');
+  const dots = pts.map((p, i) => `<circle class="line-dot" data-i="${i}" cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="3" fill="${color}"/>`).join('');
+  const base = `<line x1="${pad.left}" y1="${pad.top+innerH}" x2="${width-pad.right}" y2="${pad.top+innerH}" stroke="var(--border)"/>`;
+  const lbl = data.length ? `<text x="${pad.left}" y="${height-4}" font-size="10" fill="var(--muted)">${escapeHtml(fmtDay(data[0].day))}</text>
+    <text x="${width-pad.right}" y="${height-4}" font-size="10" fill="var(--muted)" text-anchor="end">${escapeHtml(fmtDay(data[data.length-1].day))}</text>` : '';
+  const cross = `<line id="${id}-cross" x1="0" y1="${pad.top}" x2="0" y2="${pad.top+innerH}" stroke="${color}" stroke-dasharray="2,2" opacity="0" pointer-events="none"/>`;
+  const overlay = `<rect id="${id}-ov" class="line-overlay" x="${pad.left}" y="0" width="${innerW}" height="${height}" fill="transparent"/>`;
+  return { svg: `<svg id="${id}" viewBox="0 0 ${width} ${height}" width="100%" height="${height}" preserveAspectRatio="none">${base}<path d="${path}" fill="none" stroke="${color}" stroke-width="2" stroke-linejoin="round"/>${dots}${cross}${overlay}</svg>`, pts, pad, stepX };
 }
-
-function wireLineChart(id, built, color, valueFmt) {
-  const svg = document.getElementById(id);
-  if (!svg) return;
-  const overlay = document.getElementById(`${id}-overlay`);
-  const crosshair = document.getElementById(`${id}-crosshair`);
+function wireLine(id, built, color, vfmt) {
+  const svg = document.getElementById(id); if (!svg) return;
+  const ov = document.getElementById(`${id}-ov`), cross = document.getElementById(`${id}-cross`);
   const dots = svg.querySelectorAll('.line-dot');
-  const { points, pad, stepX } = built;
-
-  overlay.addEventListener('pointermove', (ev) => {
+  const { pts, pad, stepX } = built;
+  ov.addEventListener('pointermove', ev => {
     const rect = svg.getBoundingClientRect();
-    const scaleX = CHART.width / rect.width;
-    const xInViewBox = (ev.clientX - rect.left) * scaleX;
-    let idx = stepX > 0 ? Math.round((xInViewBox - pad.left) / stepX) : 0;
-    idx = Math.max(0, Math.min(points.length - 1, idx));
-    const p = points[idx];
-
-    crosshair.setAttribute('x1', p.x);
-    crosshair.setAttribute('x2', p.x);
-    crosshair.setAttribute('opacity', '1');
-    dots.forEach((d, i) => d.setAttribute('r', i === idx ? '5' : '3'));
-
-    showChartTooltip(ev.clientX, ev.clientY, fmtDay(p.d.day), valueFmt(p.d.value), color);
+    const xv = (ev.clientX - rect.left) * (CHART.width / rect.width);
+    let idx = stepX > 0 ? Math.round((xv - pad.left) / stepX) : 0;
+    idx = Math.max(0, Math.min(pts.length - 1, idx));
+    const p = pts[idx];
+    cross.setAttribute('x1', p.x); cross.setAttribute('x2', p.x); cross.setAttribute('opacity', '1');
+    dots.forEach((dd, i) => dd.setAttribute('r', i === idx ? '5' : '3'));
+    showChartTooltip(ev.clientX, ev.clientY, fmtDay(p.d.day), vfmt(p.d.value), color);
   });
-  overlay.addEventListener('pointerleave', () => {
-    crosshair.setAttribute('opacity', '0');
-    dots.forEach(d => d.setAttribute('r', '3'));
-    hideChartTooltip();
+  ov.addEventListener('pointerleave', () => {
+    cross.setAttribute('opacity', '0'); dots.forEach(dd => dd.setAttribute('r', '3')); hideChartTooltip();
   });
 }
 
 function renderTrends(daily) {
-  const totalSessions = daily.reduce((s, d) => s + d.sessions, 0);
-  const totalRevenue  = daily.reduce((s, d) => s + d.revenue, 0);
-  const avgConversion = daily.length ? daily.reduce((s, d) => s + d.conversionRate, 0) / daily.length : 0;
+  const totOrders = daily.reduce((s, d) => s + d.purchases, 0);
+  const totGmv = daily.reduce((s, d) => s + d.revenue, 0);
+  const avgConv = daily.length ? daily.reduce((s, d) => s + d.conversionRate, 0) / daily.length : 0;
 
-  const sessionsFmt = v => `${v} session${v === 1 ? '' : 's'}`;
-  document.getElementById('chart-sessions').innerHTML =
-    `<div class="chart-total">${totalSessions.toLocaleString()}<span class="unit">sessions</span></div>` +
-    barChart(daily.map(d => ({ day: d.day, value: d.sessions })), { color: 'var(--accent)', valueFmt: sessionsFmt, id: 'chart-sessions-svg' });
-  wireBarChart('chart-sessions-svg', 'var(--accent)', sessionsFmt);
+  const oFmt = v => `${fmtInt(v)} order${v === 1 ? '' : 's'}`;
+  document.getElementById('chart-orders').innerHTML =
+    `<div class="chart-total">${fmtInt(totOrders)}<span class="unit">orders</span></div>` +
+    barChart(daily.map(d => ({ day: d.day, value: d.purchases })), { color: 'var(--accent)', id: 'c-orders' });
+  wireBar('c-orders', 'var(--accent)', oFmt);
 
-  const conversionFmt = v => `${v.toFixed(1)}%`;
-  const convBuilt = lineChart(daily.map(d => ({ day: d.day, value: d.conversionRate })), { color: 'var(--green)', max: 100, valueFmt: conversionFmt, id: 'chart-conversion-svg' });
-  document.getElementById('chart-conversion').innerHTML =
-    `<div class="chart-total">${avgConversion.toFixed(1)}%<span class="unit">avg</span></div>` + convBuilt.svg;
-  wireLineChart('chart-conversion-svg', convBuilt, 'var(--green)', conversionFmt);
+  const cFmt = v => fmtPct(v);
+  const cb = lineChart(daily.map(d => ({ day: d.day, value: d.conversionRate })), { color: 'var(--green)', max: null, id: 'c-conv' });
+  document.getElementById('chart-conv').innerHTML = `<div class="chart-total">${fmtPct(avgConv)}<span class="unit">avg</span></div>` + cb.svg;
+  wireLine('c-conv', cb, 'var(--green)', cFmt);
 
-  document.getElementById('chart-revenue').innerHTML =
-    `<div class="chart-total">${fmtMoney(totalRevenue)}<span class="unit">total</span></div>` +
-    barChart(daily.map(d => ({ day: d.day, value: d.revenue })), { color: 'var(--accent)', valueFmt: fmtMoney, id: 'chart-revenue-svg' });
-  wireBarChart('chart-revenue-svg', 'var(--accent)', fmtMoney);
+  document.getElementById('chart-gmv').innerHTML =
+    `<div class="chart-total">${fmtMoney(totGmv)}<span class="unit">total</span></div>` +
+    barChart(daily.map(d => ({ day: d.day, value: d.revenue })), { color: 'var(--accent)', id: 'c-gmv' });
+  wireBar('c-gmv', 'var(--accent)', fmtMoney);
 }
 
-// ── Funnel: both "% of top" (overall reach) and "% of previous step" (the
-// actual conversion rate of that specific transition) ─────────────────────────
-
+// ── Funnel ────────────────────────────────────────────────────────────────
+const FUNNEL_LABELS = {
+  view_item_list: 'Browse menu', view_item: 'View item', add_to_cart: 'Add to cart',
+  begin_checkout: 'Begin checkout', purchase: 'Purchase',
+};
 function renderFunnel(funnel) {
-  const byStep = {};
-  for (const r of funnel) byStep[r.step] = r;
   const maxVal = Math.max(...funnel.map(r => r.sessions), 1);
-
-  document.getElementById('funnel').innerHTML = FUNNEL_ORDER.map(name => {
-    const r = byStep[name] || { sessions: 0, pctOfFirst: 0, pctOfPrevious: 0 };
-    const w = maxVal > 0 ? Math.round(r.sessions / maxVal * 100) : 0;
+  document.getElementById('funnel').innerHTML = funnel.map((r, i) => {
+    const w = Math.round(r.sessions / maxVal * 100);
+    const tail = i === 0
+      ? '<span style="color:var(--muted)">entry</span>'
+      : `<b>${r.pctOfPrevious.toFixed(0)}%</b> kept${r.drop ? ` <span class="drop">(−${fmtInt(r.drop)})</span>` : ''}`;
     return `<div class="funnel-row">
-      <div class="funnel-label">${FUNNEL_LABELS[name] || name}</div>
-      <div class="funnel-bar-wrap">
-        <div class="funnel-bar" style="width:${w}%">${r.sessions}</div>
-      </div>
+      <div class="funnel-label">${FUNNEL_LABELS[r.step] || r.step}</div>
+      <div class="funnel-bar-wrap"><div class="funnel-bar" style="width:${w}%">${fmtInt(r.sessions)}</div></div>
       <div class="funnel-pct">${r.pctOfFirst.toFixed(0)}%</div>
-      <div class="funnel-prev"><b>${r.pctOfPrevious.toFixed(0)}%</b> continued</div>
+      <div class="funnel-prev">${tail}</div>
     </div>`;
   }).join('');
 }
 
-// ── Drop-off Guide: computed from the actual data instead of static copy ──────
+// ── Checkout health ───────────────────────────────────────────────────────
+function renderCheckout(c) {
+  const mini = (val, lab, sub) => `<div class="mini"><div class="m-val">${val}</div><div class="m-lab">${lab}</div>${sub ? `<div class="m-sub">${sub}</div>` : ''}</div>`;
+  const dTotal = c.delivery + c.pickup;
+  const delPct = dTotal ? Math.round(c.delivery / dTotal * 100) : 0;
+  const splitbar = dTotal
+    ? `<div class="splitbar"><span style="width:${delPct}%;background:var(--accent)"></span><span style="width:${100-delPct}%;background:var(--yellow)"></span></div>
+       <div class="legend"><span><i style="background:var(--accent)"></i>Delivery ${delPct}%</span><span><i style="background:var(--yellow)"></i>Pickup ${100-delPct}%</span></div>`
+    : `<div class="m-sub">no order-type data</div>`;
+  const paymix = c.payments.length
+    ? `<div class="paymix">${c.payments.slice(0,4).map(p => `<div class="paymix-row"><span>${escapeHtml(p.method)}</span><span>${fmtInt(p.count)}</span></div>`).join('')}</div>`
+    : `<div class="m-sub">no payment data</div>`;
 
-function renderInsights(funnel, screenTime) {
+  document.getElementById('checkout').innerHTML =
+    mini(fmtPct(c.abandonmentPct, 0), 'Checkout abandonment', `${fmtInt(c.completed)} of ${fmtInt(c.starts)} completed`) +
+    mini(fmtMoney(c.abandonedValue), 'Abandoned cart value', `${fmtInt(c.abandonedCarts)} carts`) +
+    mini(fmtInt(c.failedOrders), 'Failed orders', 'payment / server errors') +
+    mini(fmtPct(c.couponRate, 0), 'Checkouts with a coupon', `${fmtMoney(c.couponDiscount)} discounted`) +
+    mini(fmtPct(c.tipRate, 0), 'Checkouts with a tip', `${fmtMoneyFull(c.avgTip)} avg tip`) +
+    mini(fmtInt(dTotal), 'Order-type selections', '') +
+    `<div class="mini" style="grid-column:1/-1"><div class="m-lab" style="margin-bottom:2px">Delivery vs pickup</div>${splitbar}</div>` +
+    `<div class="mini" style="grid-column:1/-1"><div class="m-lab" style="margin-bottom:2px">Payment methods</div>${paymix}</div>`;
+}
+
+// ── Top items ─────────────────────────────────────────────────────────────
+function renderTopItems(items) {
+  const tb = document.getElementById('top-items');
+  if (!items || !items.length) { tb.innerHTML = `<tr><td colspan="4" style="color:var(--muted)">No item data in this window</td></tr>`; return; }
+  tb.innerHTML = items.map(r => `<tr>
+    <td>${escapeHtml(r.name || '—')}</td>
+    <td class="num">${fmtInt(r.adds)}</td>
+    <td class="num">${fmtInt(r.sessions)}</td>
+    <td class="num">${r.price ? fmtMoneyFull(r.price) : '—'}</td></tr>`).join('');
+}
+
+// ── Events by type (collapsible groups) ──────────────────────────────────
+const EVENT_GROUPS = [
+  ['Discovery', ['browse_menu','browse_category','view_item_list','view_item','product_viewed','search','search_results','search_result_click']],
+  ['Cart', ['add_to_cart','item_added_to_cart','remove_from_cart','cart_item_qty_changed','item_qty_changed','view_cart']],
+  ['Checkout', ['begin_checkout','order_type_selected','order_time_selected','delivery_address_selected','delivery_map_opened','payment_method_selected','new_card_form_opened','new_card_submitted','coupon_applied','coupon_cleared','coupon_selected_from_list','loyalty_points_applied','loyalty_suggestion_selected','loyalty_cleared','tip_selected','special_instructions_entered','contact_info_edited','phone_verification_sent','phone_verified','discount_item_selected','place_order_tapped']],
+  ['Order outcome', ['order_placed','purchase','checkout_abandoned','track_order','view_receipt','order_again']],
+  ['Engagement', ['home_refreshed','story_clicked','featured_item_clicked','article_clicked','event_clicked','event_buy_clicked','reward_clicked','ticket_qr_viewed','location_selected','location_directions','view_notification','upsell_shown','upsell_item_added','upsell_dismissed']],
+  ['Referral', ['referral_claim_result','referral_link_generated','referral_link_copied','referral_link_shared','referral_qr_viewed','referral_welcome_shown','referral_invite_popup_shown','referral_invite_popup_signup','referral_invite_popup_dismissed','referral_auth_banner_signup']],
+  ['Auth', ['sign_up','signup_success','login_attempt','login_success']],
+  ['System', ['session_start','session_end','screen_entered','screen_exited','screen_enter','screen_exit']],
+];
+const GROUP_OF = {}; for (const [g, evs] of EVENT_GROUPS) for (const e of evs) GROUP_OF[e] = g;
+const GROUP_ORDER = EVENT_GROUPS.map(g => g[0]).concat('Other');
+const ERROR_EVENTS = new Set(['app_error', 'order_place_failed', 'login_failed']);
+const openGroups = new Set();
+
+function badge(type) {
+  if (type === 'screen_entered' || type === 'screen_enter') return `<span class="badge badge-enter">enter</span>`;
+  if (type === 'screen_exited' || type === 'screen_exit') return `<span class="badge badge-exit">exit</span>`;
+  if (type.includes('login') || type.includes('sign_up') || type.includes('signup')) return `<span class="badge badge-login">${escapeHtml(type)}</span>`;
+  return `<span class="badge badge-event">${escapeHtml(type)}</span>`;
+}
+function renderEventTypes(byType) {
+  const groups = {}; for (const n of GROUP_ORDER) groups[n] = { total: 0, rows: [] };
+  for (const r of byType) {
+    if (ERROR_EVENTS.has(r.event_type)) continue;
+    const g = GROUP_OF[r.event_type] || 'Other';
+    groups[g].total += r.count; groups[g].rows.push(r);
+  }
+  let html = '';
+  for (const name of GROUP_ORDER) {
+    const grp = groups[name]; if (!grp.rows.length) continue;
+    const isOpen = openGroups.has(name);
+    grp.rows.sort((a, b) => b.count - a.count);
+    html += `<tr class="grp-header${isOpen ? ' open' : ''}" data-group="${escapeHtml(name)}">
+      <td><span class="grp-caret">&#9654;</span> ${name} <span class="grp-count">(${grp.rows.length})</span></td>
+      <td class="num grp-count">${fmtInt(grp.total)}</td></tr>`;
+    for (const r of grp.rows) {
+      html += `<tr class="grp-child" data-group="${escapeHtml(name)}" style="display:${isOpen ? 'table-row' : 'none'}">
+        <td style="padding-left:28px">${badge(r.event_type)}</td><td class="num">${fmtInt(r.count)}</td></tr>`;
+    }
+  }
+  const tb = document.getElementById('event-types');
+  tb.innerHTML = html;
+  tb.querySelectorAll('tr.grp-header').forEach(tr => tr.addEventListener('click', () => {
+    const name = tr.dataset.group;
+    const isOpen = openGroups.has(name);
+    if (isOpen) openGroups.delete(name); else openGroups.add(name);
+    tr.classList.toggle('open', !isOpen);
+    tb.querySelectorAll(`tr.grp-child[data-group="${CSS.escape(name)}"]`).forEach(c => c.style.display = isOpen ? 'none' : 'table-row');
+  }));
+}
+
+function renderInsights(funnel, screenTime, checkout) {
   const items = [];
-
-  // Biggest relative drop between consecutive funnel steps.
-  const steps = funnel.filter(r => r.sessions > 0 || r.step === FUNNEL_ORDER[0]);
   let worst = null;
   for (let i = 1; i < funnel.length; i++) {
-    const r = funnel[i];
-    const prevLabel = FUNNEL_LABELS[funnel[i - 1].step];
     if (funnel[i - 1].sessions === 0) continue;
-    if (!worst || r.pctOfPrevious < worst.r.pctOfPrevious) worst = { r, prevLabel, i };
+    if (!worst || funnel[i].pctOfPrevious < worst.r.pctOfPrevious) worst = { r: funnel[i], prev: funnel[i - 1] };
   }
-  if (worst) {
-    const label = FUNNEL_LABELS[worst.r.step];
-    items.push({
-      ic: '📉',
-      body: `Biggest drop-off: <b>${worst.prevLabel} → ${label}</b> — only <b>${worst.r.pctOfPrevious.toFixed(0)}%</b> of sessions that reached "${worst.prevLabel}" continued to "${label}". That's the single transition worth investigating first.`,
-    });
-  }
-
-  // Screen with the highest average time — could be genuine interest or friction.
-  if (screenTime.length > 0) {
-    const top = screenTime[0]; // already sorted by avg_sec desc from the server
-    items.push({
-      ic: '⏱️',
-      body: `Longest average time is on <b>${top.screen_name}</b> (${top.avg_sec}s, ${top.views} views). If that's a decision screen (menu item, checkout), a high time there often means friction or confusion rather than engagement.`,
-    });
-  }
-
-  items.push({
-    ic: '🛑',
-    body: `Errors (crashes, failed orders, failed logins) now live on their own page — open <b><a href="/errors.html" style="color:var(--accent)">Errors →</a></b> for the grouped, filterable breakdown.`,
-  });
-
-  document.getElementById('insights').innerHTML = items.map(it =>
-    `<div class="insight"><div class="ic">${it.ic}</div><div class="body">${it.body}</div></div>`
-  ).join('');
+  if (worst) items.push({ ic: '📉', body: `Biggest funnel drop: <b>${FUNNEL_LABELS[worst.prev.step]} → ${FUNNEL_LABELS[worst.r.step]}</b> — only <b>${worst.r.pctOfPrevious.toFixed(0)}%</b> continued (${fmtInt(worst.r.drop)} sessions lost).` });
+  if (checkout && checkout.starts > 0) items.push({ ic: '🛒', body: `<b>${fmtPct(checkout.abandonmentPct, 0)}</b> of started checkouts didn't complete — roughly <b>${fmtMoney(checkout.abandonedValue)}</b> in abandoned carts.` });
+  if (screenTime && screenTime.length) { const t = screenTime[0]; items.push({ ic: '⏱️', body: `Longest average screen time: <b>${escapeHtml(t.screen_name)}</b> (${t.avg_sec}s over ${fmtInt(t.views)} views).` }); }
+  items.push({ ic: '🛑', body: `Crashes and failures are on the <a href="/errors.html">Errors page</a>.` });
+  document.getElementById('insights').innerHTML = items.map(it => `<div class="insight"><div class="ic">${it.ic}</div><div class="body">${it.body}</div></div>`).join('');
 }
 
-// ── App leaderboard: every app side by side, sortable ────────────────────────
-
+// ── Leaderboard ─────────────────────────────────────────────────────────────
 let lbData = [];
-let lbSort = { key: 'sessions', dir: -1 };
+let lbSort = { key: 'gmv', dir: -1 };
+let lbView = 'top';
 let lbExpanded = false;
 const LB_COLLAPSED = 10;
+const LB_NUM_COLS = ['orders', 'gmv', 'conversionRate', 'aov', 'users'];
 
-const LB_COLS = ['sessions', 'users', 'orders', 'conversionRate', 'revenue', 'aov'];
+function renderLeaderboard(perApp) { lbData = perApp || []; paintLeaderboard(); }
 
-function renderLeaderboard(perApp) {
-  lbData = perApp || [];
-  paintLeaderboard();
-}
-
-function paintLeaderboard() {
+function currentRows() {
+  if (lbView === 'under') {
+    const busy = lbData.filter(r => r.sessions >= 30);
+    return busy.slice().sort((a, b) => a.conversionRate - b.conversionRate);
+  }
   const { key, dir } = lbSort;
-  const rows = [...lbData].sort((a, b) => {
+  return [...lbData].sort((a, b) => {
     const av = a[key], bv = b[key];
     if (typeof av === 'string') return av.localeCompare(bv) * dir;
     return (av - bv) * dir;
   });
+}
 
+function paintLeaderboard() {
+  const rows = currentRows();
   const best = {};
-  for (const k of LB_COLS) best[k] = Math.max(0, ...lbData.map(r => r[k]));
-
-  const cell = (r, k, text) =>
-    `<td class="num${r[k] > 0 && r[k] === best[k] ? ' lb-best' : ''}">${text}</td>`;
+  for (const k of LB_NUM_COLS) best[k] = Math.max(0, ...lbData.map(r => r[k]));
+  const cell = (r, k, text) => `<td class="num${r[k] > 0 && r[k] === best[k] ? ' lb-best' : ''}">${text}</td>`;
+  const trend = (r) => {
+    const d = r.orders - r.prevOrders;
+    if (!r.prevOrders && !r.orders) return '';
+    if (d > 0) return ` <span class="trend-up" title="was ${r.prevOrders}">▲</span>`;
+    if (d < 0) return ` <span class="trend-down" title="was ${r.prevOrders}">▼</span>`;
+    return ` <span class="trend-flat">▪</span>`;
+  };
 
   const toggle = document.getElementById('lb-toggle');
   const collapsible = rows.length > LB_COLLAPSED;
   const shown = collapsible && !lbExpanded ? rows.slice(0, LB_COLLAPSED) : rows;
   toggle.hidden = !collapsible;
-  if (collapsible) {
-    toggle.textContent = lbExpanded
-      ? '▴ Show less'
-      : `▾ Show all ${rows.length} apps`;
-  }
+  if (collapsible) toggle.textContent = lbExpanded ? '▴ Show less' : `▾ Show all ${rows.length} apps`;
 
-  const tbody = document.getElementById('leaderboard-body');
-  if (rows.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="7" style="color:var(--muted)">No app data yet</td></tr>`;
+  const tb = document.getElementById('lb-body');
+  if (!rows.length) {
+    tb.innerHTML = `<tr><td colspan="6" style="color:var(--muted)">${lbView === 'under' ? 'No apps with enough traffic yet' : 'No app data in this window'}</td></tr>`;
   } else {
-    tbody.innerHTML = shown.map((r, i) => `
-      <tr class="lb-row" data-app="${escapeHtml(r.app_slug)}">
-        <td><span class="lb-rank">${i + 1}</span>${escapeHtml(r.app_slug)}</td>
-        ${cell(r, 'sessions', r.sessions.toLocaleString())}
-        ${cell(r, 'users', r.users.toLocaleString())}
-        ${cell(r, 'orders', r.orders.toLocaleString())}
-        ${cell(r, 'conversionRate', r.conversionRate.toFixed(1) + '%')}
-        ${cell(r, 'revenue', fmtMoney(r.revenue))}
-        ${cell(r, 'aov', fmtMoney(r.aov))}
-      </tr>
-    `).join('');
-    tbody.querySelectorAll('tr.lb-row').forEach(tr => {
-      tr.addEventListener('click', () => {
-        document.getElementById('app-filter').value = tr.dataset.app;
-        load();
-        connectStream();
-      });
-    });
+    tb.innerHTML = shown.map((r, i) => `<tr class="lb-row" data-app="${escapeHtml(r.app_slug)}">
+      <td><span class="lb-rank">${i + 1}</span>${escapeHtml(r.app_slug)}</td>
+      <td class="num">${fmtInt(r.orders)}${trend(r)}</td>
+      ${cell(r, 'gmv', fmtMoney(r.gmv))}
+      ${cell(r, 'conversionRate', fmtPct(r.conversionRate))}
+      ${cell(r, 'aov', fmtMoneyFull(r.aov))}
+      ${cell(r, 'users', fmtInt(r.users))}
+    </tr>`).join('');
+    tb.querySelectorAll('tr.lb-row').forEach(tr => tr.addEventListener('click', () => {
+      document.getElementById('app-filter').value = tr.dataset.app;
+      onFilterChange();
+    }));
   }
 
-  document.querySelectorAll('#leaderboard th').forEach(th => {
+  document.querySelectorAll('#lb th').forEach(th => {
     const k = th.dataset.sort;
-    const base = th.textContent.replace(/ [▲▼]$/, '');
-    th.classList.toggle('sorted', k === key);
-    th.textContent = k === key ? `${base} ${dir < 0 ? '▼' : '▲'}` : base;
+    const baseTxt = th.textContent.replace(/ [▲▼]$/, '');
+    const active = lbView === 'top' && k === lbSort.key;
+    th.classList.toggle('sorted', active);
+    th.textContent = active ? `${baseTxt} ${lbSort.dir < 0 ? '▼' : '▲'}` : baseTxt;
   });
 }
 
-document.querySelectorAll('#leaderboard th').forEach(th => {
-  th.addEventListener('click', () => {
-    const k = th.dataset.sort;
-    if (lbSort.key === k) lbSort.dir *= -1;
-    else lbSort = { key: k, dir: k === 'app_slug' ? 1 : -1 };
-    paintLeaderboard();
-  });
-});
-
-document.getElementById('lb-toggle').addEventListener('click', () => {
-  lbExpanded = !lbExpanded;
+document.querySelectorAll('#lb th').forEach(th => th.addEventListener('click', () => {
+  if (lbView !== 'top') return;
+  const k = th.dataset.sort;
+  if (lbSort.key === k) lbSort.dir *= -1;
+  else lbSort = { key: k, dir: k === 'app_slug' ? 1 : -1 };
   paintLeaderboard();
-});
+}));
+document.getElementById('lb-toggle').addEventListener('click', () => { lbExpanded = !lbExpanded; paintLeaderboard(); });
+document.querySelectorAll('#lb-tabs .tab').forEach(t => t.addEventListener('click', () => {
+  document.querySelectorAll('#lb-tabs .tab').forEach(x => x.classList.toggle('active', x === t));
+  lbView = t.dataset.view; lbExpanded = false; paintLeaderboard();
+}));
 
+// ── Render everything ─────────────────────────────────────────────────────
 function renderStats(s) {
-  document.getElementById('kpi-total').textContent      = s.total.toLocaleString();
-  document.getElementById('kpi-sessions').textContent   = s.sessions.toLocaleString();
-  document.getElementById('kpi-users').textContent      = s.users.toLocaleString();
-  document.getElementById('kpi-conversion').textContent = `${(s.conversionRate || 0).toFixed(1)}%`;
-  document.getElementById('kpi-revenue').textContent    = fmtMoney(s.revenue);
-  document.getElementById('kpi-aov').textContent        = fmtMoney(s.aov);
+  const k = s.kpis || {}, p = s.prev || {};
+  const orders = k.orders ?? s.total ?? 0;
+  const gmv = k.gmv ?? s.revenue ?? 0;
+  const conv = k.conversion ?? s.conversionRate ?? 0;
+  const aov = k.aov ?? s.aov ?? 0;
+  const crash = k.crashFreePct ?? 100;
+  const newU = k.newUsers ?? 0;
 
-  // app / platform filter dropdowns (preserve current selection)
-  const select = document.getElementById('app-filter');
-  const current = select.value;
-  select.innerHTML = '<option value="">All apps</option>' +
-    s.apps.map(a => `<option value="${a}">${a}</option>`).join('');
-  select.value = current;
+  const set = (id, val, dHtml) => {
+    document.getElementById(id).textContent = val;
+    if (dHtml !== undefined) document.getElementById(id + '-d').innerHTML = dHtml;
+  };
+  set('k-orders', fmtInt(orders), deltaHTML(orders, p.orders, 'rel', true));
+  set('k-gmv', fmtMoney(gmv), deltaHTML(gmv, p.gmv, 'rel', true));
+  set('k-conv', fmtPct(conv), deltaHTML(conv, p.conversion, 'pp', true));
+  set('k-aov', fmtMoneyFull(aov), deltaHTML(aov, p.aov, 'rel', true));
+  set('k-crash', fmtPct(crash), deltaHTML(crash, p.crashFreePct, 'pp', true));
+  set('k-new', fmtInt(newU), deltaHTML(newU, p.newUsers, 'rel', true));
 
-  const platformSelect = document.getElementById('platform-filter');
-  const currentPlatform = platformSelect.value;
-  platformSelect.innerHTML = '<option value="">All platforms</option>' +
-    s.platforms.map(p => `<option value="${p}">${p}</option>`).join('');
-  platformSelect.value = currentPlatform;
+  const appName = currentApp() || 'all apps';
+  document.getElementById('window-label').textContent = `${s.windowLabel || 'last ' + currentDays() + ' days'} · ${appName}`;
+
+  // filter dropdowns (preserve selection)
+  const asel = document.getElementById('app-filter'), acur = asel.value;
+  asel.innerHTML = '<option value="">All apps</option>' + (s.apps || []).map(a => `<option value="${escapeHtml(a)}">${escapeHtml(a)}</option>`).join('');
+  asel.value = acur;
+  const psel = document.getElementById('platform-filter'), pcur = psel.value;
+  psel.innerHTML = '<option value="">All platforms</option>' + (s.platforms || []).map(x => `<option value="${escapeHtml(x)}">${escapeHtml(x)}</option>`).join('');
+  psel.value = pcur;
 
   renderLeaderboard(s.perApp);
-  renderTrends(s.daily);
-  renderFunnel(s.funnel);
-  renderEventTypes(s.byType);
-  renderInsights(s.funnel, s.screenTime);
+  renderTrends(s.daily || []);
+  renderFunnel(s.funnel || []);
+  if (s.checkout) renderCheckout(s.checkout);
+  renderTopItems(s.topItems);
+  renderEventTypes(s.byType || []);
+  renderInsights(s.funnel || [], s.screenTime || [], s.checkout);
+  document.getElementById('screen-time').innerHTML = (s.screenTime || []).map(r =>
+    `<tr><td>${escapeHtml(r.screen_name)}</td><td class="num">${r.avg_sec}s</td><td class="num">${fmtInt(r.views)}</td></tr>`).join('');
 
-  // screen time
-  document.getElementById('screen-time').innerHTML = s.screenTime.map(r =>
-    `<tr><td>${r.screen_name}</td><td>${r.avg_sec}s</td><td>${r.views}</td></tr>`
-  ).join('');
-
-  // recent events (initial load)
-  const tbody = document.getElementById('feed');
-  tbody.innerHTML = '';
-  for (const e of s.recent) prependRow(e);
+  const feed = document.getElementById('feed');
+  feed.innerHTML = '';
+  for (const e of (s.recent || [])) prependRow(e);
 }
 
 function prependRow(e) {
-  const tbody = document.getElementById('feed');
+  const tb = document.getElementById('feed');
   const tr = document.createElement('tr');
-  const props = e.properties ? JSON.stringify(typeof e.properties === 'string' ? JSON.parse(e.properties) : e.properties) : '';
-  const dur  = e.duration_ms != null ? `${(e.duration_ms/1000).toFixed(1)}s` : '';
+  const props = e.properties ? JSON.stringify(typeof e.properties === 'string' ? tryParse(e.properties) : e.properties) : '';
+  const dur = e.duration_ms != null ? `${(e.duration_ms/1000).toFixed(1)}s` : '';
   const uid = e.user_id
     ? `<span class="badge badge-user" title="${escapeHtml(e.user_id)}">User</span>`
     : `<span class="badge badge-guest" title="${escapeHtml(e.anonymous_id || '')}">Guest</span>`;
-  tr.innerHTML = `
-    <td class="ts">${fmt(e.timestamp)}</td>
-    <td class="ts">${e.app_slug || ''}</td>
-    <td>${badge(e.event_type)}</td>
-    <td>${e.screen_name || ''}</td>
-    <td>${dur}</td>
-    <td class="ts">${uid}</td>
-    <td class="props">${props}</td>
-  `;
+  tr.innerHTML = `<td class="ts">${fmt(e.timestamp)}</td><td class="ts">${escapeHtml(e.app_slug || '')}</td>
+    <td>${badge(e.event_type)}</td><td>${escapeHtml(e.screen_name || '')}</td><td>${dur}</td>
+    <td class="ts">${uid}</td><td class="props">${escapeHtml(props)}</td>`;
   tr.addEventListener('click', () => showEventDetail(e));
-  tbody.prepend(tr);
-  // keep feed at 200 rows max
-  while (tbody.children.length > 200) tbody.removeChild(tbody.lastChild);
+  tb.prepend(tr);
+  while (tb.children.length > 150) tb.removeChild(tb.lastChild);
 }
+function tryParse(s) { try { return JSON.parse(s); } catch { return {}; } }
 
-// ── Event detail modal ─────────────────────────────────────────────────────
-
-function labelize(key) {
-  return String(key).replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+// ── Event detail modal ───────────────────────────────────────────────────
+function formatValue(v) {
+  if (v === null || v === undefined || v === '') return '<span class="props-empty">—</span>';
+  if (typeof v === 'object' && v !== null && 'raw' in v) return v.raw;
+  if (typeof v === 'boolean') return v ? 'Yes' : 'No';
+  if (typeof v === 'object') return `<pre style="white-space:pre-wrap;font:inherit;font-size:12px">${escapeHtml(JSON.stringify(v, null, 2))}</pre>`;
+  return escapeHtml(String(v));
 }
-
-function formatValue(value) {
-  if (value === null || value === undefined || value === '') return '<span class="props-empty">—</span>';
-  if (typeof value === 'object' && value !== null && 'raw' in value) return value.raw;
-  if (typeof value === 'boolean') return value ? 'Yes' : 'No';
-  if (typeof value === 'object') {
-    return `<pre style="white-space:pre-wrap;font-family:inherit;font-size:12px;color:var(--text)">${escapeHtml(JSON.stringify(value, null, 2))}</pre>`;
-  }
-  return escapeHtml(String(value));
-}
-
 function showEventDetail(e) {
   document.getElementById('modal-title').textContent = labelize(e.event_type || 'Event');
-
   const dur = e.duration_ms != null ? `${(e.duration_ms/1000).toFixed(1)}s` : null;
   const fields = [
-    ['Time',        new Date(e.timestamp).toLocaleString()],
-    ['App',         e.app_slug],
-    ['Type',        e.event_type],
-    ['Screen',      e.screen_name],
-    ['Duration',    dur],
-    ['User Type',   e.user_id !== undefined ? { raw: e.user_id ? '<span class="badge badge-user">User</span>' : '<span class="badge badge-guest">Guest</span>' } : null],
-    ['User ID',     e.user_id],
-    ['Anonymous ID', e.anonymous_id],
-    ['Session ID',  e.session_id],
-    ['Platform',    e.platform],
-    ['App Version', e.app_version],
-    ['OS Version',  e.os_version],
+    ['Time', new Date(e.timestamp).toLocaleString()], ['App', e.app_slug], ['Type', e.event_type],
+    ['Screen', e.screen_name], ['Duration', dur],
+    ['User Type', e.user_id !== undefined ? { raw: e.user_id ? '<span class="badge badge-user">User</span>' : '<span class="badge badge-guest">Guest</span>' } : null],
+    ['User ID', e.user_id], ['Anonymous ID', e.anonymous_id], ['Session ID', e.session_id],
+    ['Platform', e.platform], ['App Version', e.app_version], ['OS Version', e.os_version],
   ];
-
-  document.getElementById('modal-detail').innerHTML = fields
-    .filter(([, v]) => v !== null && v !== undefined && v !== '')
-    .map(([label, v]) => `<tr><td>${escapeHtml(label)}</td><td>${formatValue(v)}</td></tr>`)
-    .join('');
-
+  document.getElementById('modal-detail').innerHTML = fields.filter(([, v]) => v !== null && v !== undefined && v !== '')
+    .map(([l, v]) => `<tr><td>${escapeHtml(l)}</td><td>${formatValue(v)}</td></tr>`).join('');
   let props = e.properties;
-  if (typeof props === 'string') {
-    try { props = JSON.parse(props); } catch { props = null; }
-  }
-
-  const propsTable = document.getElementById('modal-props');
+  if (typeof props === 'string') props = tryParse(props);
   const entries = props && typeof props === 'object' ? Object.entries(props) : [];
-  if (entries.length === 0) {
-    propsTable.innerHTML = `<tr><td colspan="2"><span class="props-empty">No additional properties</span></td></tr>`;
-  } else {
-    propsTable.innerHTML = entries
-      .map(([key, v]) => `<tr><td>${escapeHtml(labelize(key))}</td><td>${formatValue(v)}</td></tr>`)
-      .join('');
-  }
-
+  document.getElementById('modal-props').innerHTML = entries.length
+    ? entries.map(([kk, v]) => `<tr><td>${escapeHtml(labelize(kk))}</td><td>${formatValue(v)}</td></tr>`).join('')
+    : `<tr><td colspan="2"><span class="props-empty">No additional properties</span></td></tr>`;
   document.getElementById('event-modal').classList.add('open');
 }
-
-function closeEventDetail() {
-  document.getElementById('event-modal').classList.remove('open');
-}
-
+function closeEventDetail() { document.getElementById('event-modal').classList.remove('open'); }
 document.getElementById('modal-close').addEventListener('click', closeEventDetail);
-document.getElementById('event-modal').addEventListener('click', (ev) => {
-  if (ev.target.id === 'event-modal') closeEventDetail();
-});
-document.addEventListener('keydown', (ev) => {
-  if (ev.key === 'Escape') closeEventDetail();
-});
+document.getElementById('event-modal').addEventListener('click', ev => { if (ev.target.id === 'event-modal') closeEventDetail(); });
+document.addEventListener('keydown', ev => { if (ev.key === 'Escape') closeEventDetail(); });
 
-// initial load
-function currentApp() {
-  return document.getElementById('app-filter').value;
-}
-function currentPlatform() {
-  return document.getElementById('platform-filter').value;
-}
-function currentDays() {
-  return document.getElementById('days-filter').value;
-}
-
-// Paint the last response we saw for this exact filter combo straight away, so
-// reopening the dashboard shows numbers instantly instead of a wall of "—"
-// while the (sometimes slow, remote) /api/stats round-trip is in flight. The
-// fresh data replaces it a moment later.
-function statsKey() {
-  return `stats:${currentApp()}|${currentPlatform()}|${currentDays()}`;
-}
+// ── Load / filters / stream ──────────────────────────────────────────────
+function currentApp() { return document.getElementById('app-filter').value; }
+function currentPlatform() { return document.getElementById('platform-filter').value; }
+function currentDays() { return document.getElementById('days-filter').value; }
+function statsKey() { return `stats:${currentApp()}|${currentPlatform()}|${currentDays()}`; }
 function paintCached() {
-  try {
-    const raw = localStorage.getItem(statsKey());
-    if (raw) { renderStats(JSON.parse(raw)); return true; }
-  } catch {}
+  try { const raw = localStorage.getItem(statsKey()); if (raw) { renderStats(JSON.parse(raw)); return true; } } catch {}
   return false;
 }
 
 let loadSeq = 0;
 async function load() {
-  const mySeq = ++loadSeq;
+  const my = ++loadSeq;
   document.body.classList.add('loading');
   try {
-    const params = new URLSearchParams();
-    if (currentApp()) params.set('app_slug', currentApp());
-    if (currentPlatform()) params.set('platform', currentPlatform());
-    params.set('days', currentDays());
-    const r = await fetch('/api/stats?' + params.toString());
-    if (mySeq !== loadSeq) return; // a newer filter change already superseded this
-    if (!r.ok) return;             // transient 503 while the worker warms — keep what's on screen
+    const p = new URLSearchParams();
+    if (currentApp()) p.set('app_slug', currentApp());
+    if (currentPlatform()) p.set('platform', currentPlatform());
+    p.set('days', currentDays());
+    const r = await fetch('/api/stats?' + p.toString());
+    if (my !== loadSeq) return;
+    if (!r.ok) return;
     const s = await r.json();
     if (!s || s.error) return;
     renderStats(s);
     try { localStorage.setItem(statsKey(), JSON.stringify(s)); } catch {}
   } finally {
-    if (mySeq === loadSeq) document.body.classList.remove('loading');
+    if (my === loadSeq) document.body.classList.remove('loading');
   }
 }
-paintCached();
-load();
-// The live feed stays current via SSE; the heavier /api/stats aggregate only
-// needs an occasional refresh, so poll every 30s rather than every 10s to keep
-// load off the host.
-setInterval(load, 30000);
 
-// real-time feed via SSE — recreated whenever the app/platform filter changes
 let es;
 function connectStream() {
   if (es) es.close();
-  const appSlug = currentApp();
-  const platform = currentPlatform();
-  const params = new URLSearchParams();
-  if (appSlug) params.set('app_slug', appSlug);
-  if (platform) params.set('platform', platform);
-  const qs = params.toString();
+  const p = new URLSearchParams();
+  if (currentApp()) p.set('app_slug', currentApp());
+  if (currentPlatform()) p.set('platform', currentPlatform());
+  const qs = p.toString();
   es = new EventSource('/api/stream' + (qs ? `?${qs}` : ''));
-  es.onmessage = e => {
-    const event = JSON.parse(e.data);
-    prependRow(event);
-    // bump KPI counter
-    const el = document.getElementById('kpi-total');
-    el.textContent = (parseInt(el.textContent.replace(/,/g,''), 10) + 1).toLocaleString();
-  };
+  es.onmessage = e => { try { prependRow(JSON.parse(e.data)); } catch {} };
 }
-connectStream();
 
-document.getElementById('app-filter').addEventListener('change', () => {
-  paintCached();
-  load();
-  connectStream();
-});
-document.getElementById('platform-filter').addEventListener('change', () => {
-  paintCached();
-  load();
-  connectStream();
-});
-document.getElementById('days-filter').addEventListener('change', () => {
-  paintCached();
-  load();
-});
+function onFilterChange() { paintCached(); load(); connectStream(); }
+document.getElementById('app-filter').addEventListener('change', onFilterChange);
+document.getElementById('platform-filter').addEventListener('change', onFilterChange);
+document.getElementById('days-filter').addEventListener('change', () => { paintCached(); load(); });
+
+paintCached();
+load();
+setInterval(load, 30000);
+connectStream();
 </script>
 </body>
 </html>
