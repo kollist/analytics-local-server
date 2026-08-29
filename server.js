@@ -40,9 +40,23 @@ const db = new Database(path.join(dbDir, 'analytics.sqlite'));
 // repeated full-table scans off the (often slow, shared) host disk.
 db.pragma('journal_mode = WAL');
 db.pragma('synchronous = NORMAL');
-db.pragma('cache_size = -16000');   // ~16 MB page cache
-db.pragma('mmap_size = 134217728'); // 128 MB
+db.pragma('cache_size = -16000');       // ~16 MB page cache
+db.pragma('mmap_size = 67108864');      // 64 MB — kept modest so mapped pages
+                                        // don't inflate RSS against the host's
+                                        // per-account memory limit
 db.pragma('temp_store = MEMORY');
+db.pragma('journal_size_limit = 67108864'); // cap the WAL at 64 MB after checkpoint
+
+// Passive WAL checkpoints get starved when the dashboard is polling constantly,
+// so the WAL can grow into the hundreds of MB. Force a truncating checkpoint
+// and refresh the query planner's stats on a slow timer.
+setInterval(() => {
+  try {
+    db.pragma('wal_checkpoint(TRUNCATE)');
+    db.pragma('optimize');
+  } catch { /* a checkpoint that can't get the lock this round is harmless */ }
+}, 5 * 60 * 1000).unref();
+db.pragma('optimize'); // also run once at startup
 
 // Batch-payload schema (app_slug + platform, device_model now optional).
 db.exec(`
@@ -74,6 +88,9 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_app_type_session ON events(app_slug, event_type, session_id);
   CREATE INDEX IF NOT EXISTS idx_type_session     ON events(event_type, session_id);
   CREATE INDEX IF NOT EXISTS idx_timestamp        ON events(timestamp);
+  -- COUNT(DISTINCT anonymous_id) for the "Unique Users" KPI was the last
+  -- remaining full-table scan; this lets it run as a covering index scan.
+  CREATE INDEX IF NOT EXISTS idx_anon             ON events(anonymous_id);
 `);
 
 const insertEvent = db.prepare(`
@@ -295,13 +312,26 @@ app.get('/api/stats', (req, res) => {
   }
   const aov = purchaseRows.length > 0 ? revenue / purchaseRows.length : 0;
 
-  // Daily time series for the last `days` days (UTC-bucketed, matching the
-  // ISO timestamps written at ingest time). Missing days are filled with zeros
-  // so the chart always spans the full requested window.
-  const dayRows = db.prepare(`
-    SELECT substr(timestamp,1,10) as day, session_id, event_type, properties
+  // Daily time series for the last `days` days (UTC-bucketed via substr on the
+  // ISO timestamp). Aggregated in SQL: pulling every event row in the window
+  // into JS to build Sets was millions of rows on the production DB and was the
+  // single biggest driver of the dashboard's memory use and cold-load latency.
+  const dayAggRows = db.prepare(`
+    SELECT substr(timestamp,1,10) AS day,
+           COUNT(DISTINCT session_id) AS sessions,
+           COUNT(DISTINCT CASE WHEN event_type = 'purchase' THEN session_id END) AS purchaseSessions
     FROM events
     WHERE timestamp >= datetime('now', ?)
+    ${andClause}
+    GROUP BY day
+  `).all(`-${days} days`, ...args);
+
+  // Per-day revenue needs the `value` from each purchase's JSON blob, but only
+  // for purchase rows in the window (a small slice), so it's its own small query.
+  const dayRevenueRows = db.prepare(`
+    SELECT substr(timestamp,1,10) AS day, properties
+    FROM events
+    WHERE event_type = 'purchase' AND timestamp >= datetime('now', ?)
     ${andClause}
   `).all(`-${days} days`, ...args);
 
@@ -311,23 +341,25 @@ app.get('/api/stats', (req, res) => {
     const d = new Date(todayUTC);
     d.setUTCDate(d.getUTCDate() - i);
     const key = d.toISOString().slice(0, 10);
-    byDay[key] = { day: key, sessions: new Set(), purchaseSessions: new Set(), revenue: 0 };
+    byDay[key] = { day: key, sessions: 0, purchaseSessions: 0, revenue: 0 };
   }
-  for (const r of dayRows) {
-    const bucket = byDay[r.day];
-    if (!bucket) continue;
-    bucket.sessions.add(r.session_id);
-    if (r.event_type === 'purchase') {
-      bucket.purchaseSessions.add(r.session_id);
-      const v = Number(parseProps(r.properties).value);
-      if (!Number.isNaN(v)) bucket.revenue += v;
-    }
+  for (const r of dayAggRows) {
+    const b = byDay[r.day];
+    if (!b) continue;
+    b.sessions = r.sessions;
+    b.purchaseSessions = r.purchaseSessions;
+  }
+  for (const r of dayRevenueRows) {
+    const b = byDay[r.day];
+    if (!b) continue;
+    const v = Number(parseProps(r.properties).value);
+    if (!Number.isNaN(v)) b.revenue += v;
   }
   const daily = Object.values(byDay).map(b => ({
     day: b.day,
-    sessions: b.sessions.size,
-    purchases: b.purchaseSessions.size,
-    conversionRate: b.sessions.size > 0 ? (b.purchaseSessions.size / b.sessions.size) * 100 : 0,
+    sessions: b.sessions,
+    purchases: b.purchaseSessions,
+    conversionRate: b.sessions > 0 ? (b.purchaseSessions / b.sessions) * 100 : 0,
     revenue: Math.round(b.revenue * 100) / 100,
   }));
 

@@ -938,7 +938,10 @@ async function load() {
 }
 paintCached();
 load();
-setInterval(load, 10000); // refresh stats every 10s
+// The live feed stays current via SSE; the heavier /api/stats aggregate only
+// needs an occasional refresh, so poll every 30s rather than every 10s to keep
+// load off the host.
+setInterval(load, 30000);
 
 // real-time feed via SSE — recreated whenever the app/platform filter changes
 let es;
