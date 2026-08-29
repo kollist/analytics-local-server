@@ -11,6 +11,20 @@ it unauthenticated. With no credentials set the dashboard is open and the server
 logs a warning on boot. **Set both on the production host** (Hostinger: hPanel →
 Advanced → Node.js → environment variables).
 
+## Canonical events
+
+- **Orders / GMV / conversion are all counted from the `purchase` event.** It has
+  the full history and fires for every order.
+- **`order_placed` is ignored.** It was added later, only fires for ~10% of
+  orders, and only ~11 sessions in the whole DB have it without a matching
+  `purchase`. It carries `order_type` / `payment` / `total` inline, but the
+  dashboard gets those from `order_type_selected` / `payment_method_selected`.
+  The app should stop sending `order_placed` (or fold its fields into
+  `purchase`); nothing here needs to change and there's nothing to backfill.
+- The ordering funnel is `view_item_list → view_item → add_to_cart →
+  begin_checkout → purchase`. `place_order_tapped` is left out — only ~15% of
+  purchases emit it.
+
 ## Architecture note
 
 The dashboard aggregation runs in a worker thread (`analytics-worker.js` +

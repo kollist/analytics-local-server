@@ -293,6 +293,10 @@
       <div>
         <h3>Events by type</h3>
         <table><tbody id="event-types"></tbody></table>
+        <div style="color:var(--muted);font-size:11px;margin-top:8px;line-height:1.5">
+          Orders, GMV and conversion are counted from the <b>purchase</b> event.
+          <b>order_placed</b> is a partial legacy event (fires for ~10% of orders) and is not used in any metric.
+        </div>
       </div>
       <div>
         <h3>Avg time per screen (seconds, outliers capped)</h3>
