@@ -4,6 +4,7 @@ const express = require('express');
 const compression = require('compression');
 const Database = require('better-sqlite3');
 const { Worker } = require('worker_threads');
+const { redactRow } = require('./lib/analytics-queries');
 const path = require('path');
 const fs = require('fs');
 
@@ -161,7 +162,7 @@ const insertEvent = db.prepare(`
 const subscribers = new Set();
 
 function broadcast(event) {
-  const data = `data: ${JSON.stringify(event)}\n\n`;
+  const data = `data: ${JSON.stringify(redactRow(event))}\n\n`;
   for (const sub of subscribers) {
     if (sub.appSlug && sub.appSlug !== event.app_slug) continue;
     if (sub.platform && sub.platform !== event.platform) continue;
