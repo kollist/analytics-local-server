@@ -899,8 +899,10 @@ async function load() {
     if (currentPlatform()) params.set('platform', currentPlatform());
     params.set('days', currentDays());
     const r = await fetch('/api/stats?' + params.toString());
-    const s = await r.json();
     if (mySeq !== loadSeq) return; // a newer filter change already superseded this
+    if (!r.ok) return;             // transient 503 while the worker warms — keep what's on screen
+    const s = await r.json();
+    if (!s || s.error) return;
     renderStats(s);
     try { localStorage.setItem(statsKey(), JSON.stringify(s)); } catch {}
   } finally {

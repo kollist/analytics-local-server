@@ -209,6 +209,11 @@ async function load() {
   try {
     const r = await fetch('/api/errors?' + qs());
     const d = await r.json();
+    if (!r.ok || d.error) {
+      document.getElementById('grouped').innerHTML = `<tr><td colspan="6" class="empty">${esc(d.error || 'Loading…')} — retrying…</td></tr>`;
+      setTimeout(load, 3000);
+      return;
+    }
     render(d);
   } catch (e) {
     document.getElementById('grouped').innerHTML = `<tr><td colspan="6" class="empty">Failed to load: ${esc(e.message)}</td></tr>`;
