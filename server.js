@@ -1,6 +1,7 @@
 'use strict';
 
 const express = require('express');
+const compression = require('compression');
 const Database = require('better-sqlite3');
 const path = require('path');
 const fs = require('fs');
@@ -33,6 +34,16 @@ function findPersistentDir(startDir) {
 const dbDir = findPersistentDir(__dirname) || __dirname;
 const db = new Database(path.join(dbDir, 'analytics.sqlite'));
 
+// Performance pragmas. The dashboard fires ~20 aggregate scans per /api/stats
+// call and the ingest endpoint writes concurrently; WAL lets readers and the
+// writer run without blocking each other, and the larger cache / mmap keep the
+// repeated full-table scans off the (often slow, shared) host disk.
+db.pragma('journal_mode = WAL');
+db.pragma('synchronous = NORMAL');
+db.pragma('cache_size = -16000');   // ~16 MB page cache
+db.pragma('mmap_size = 134217728'); // 128 MB
+db.pragma('temp_store = MEMORY');
+
 // Batch-payload schema (app_slug + platform, device_model now optional).
 db.exec(`
   CREATE TABLE IF NOT EXISTS events (
@@ -57,6 +68,12 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_screen   ON events(screen_name);
   CREATE INDEX IF NOT EXISTS idx_session  ON events(session_id);
   CREATE INDEX IF NOT EXISTS idx_received ON events(received_at);
+  -- The funnel and per-app leaderboard both do COUNT(DISTINCT session_id)
+  -- filtered by event_type (and often app_slug); this covering index lets
+  -- those run straight off the index instead of scanning the whole table.
+  CREATE INDEX IF NOT EXISTS idx_app_type_session ON events(app_slug, event_type, session_id);
+  CREATE INDEX IF NOT EXISTS idx_type_session     ON events(event_type, session_id);
+  CREATE INDEX IF NOT EXISTS idx_timestamp        ON events(timestamp);
 `);
 
 const insertEvent = db.prepare(`
@@ -117,6 +134,10 @@ function summarizeError(eventType, props) {
 // ── Express ───────────────────────────────────────────────────────────────────
 
 const app = express();
+// gzip everything — the /api/stats JSON (recent + errors + per-app + daily
+// series) compresses ~5–10x, which is the difference between instant and
+// several seconds on a slow mobile connection to the host.
+app.use(compression());
 app.use(express.json({ limit: '2mb' }));
 app.use(express.static(path.join(__dirname, 'public')));
 
@@ -168,15 +189,37 @@ app.post('/api/v1/events', (req, res) => {
     }
   });
   insertMany(events);
+  if (inserted > 0) statsEpoch++; // invalidate the dashboard stats cache
 
   res.json({ received: inserted });
 });
 
 // ── Dashboard API ─────────────────────────────────────────────────────────────
 
+// Short-lived response cache. Every dashboard tab re-requests /api/stats every
+// 10s and they all get identical data for a given (app, platform, days) combo,
+// so computing it more than once per few seconds is wasted work on the host.
+// The cache is dropped whenever new events arrive, so numbers never lag real
+// data by more than one ingest batch.
+const statsCache = new Map(); // key -> { at, body }
+const STATS_TTL_MS = 8000;
+let statsEpoch = 0; // bumped on every ingest; part of the cache key
+
 app.get('/api/stats', (req, res) => {
   const appSlug  = req.query.app_slug || null;
   const platform = req.query.platform || null;
+  const daysRaw  = Math.min(Math.max(parseInt(req.query.days, 10) || 14, 1), 90);
+
+  const cacheKey = `${statsEpoch}|${appSlug}|${platform}|${daysRaw}`;
+  const hit = statsCache.get(cacheKey);
+  if (hit && Date.now() - hit.at < STATS_TTL_MS) {
+    return res.json(hit.body);
+  }
+  const sendJson = (body) => {
+    statsCache.set(cacheKey, { at: Date.now(), body });
+    if (statsCache.size > 64) statsCache.clear(); // bounded; keys churn on ingest anyway
+    res.json(body);
+  };
 
   // Both filters are optional and independent ("all apps" / "all platforms"),
   // so build the WHERE clause from whichever ones are actually set.
@@ -186,7 +229,7 @@ app.get('/api/stats', (req, res) => {
   if (platform) { filters.push('platform = ?');  args.push(platform); }
   const where     = filters.length ? `WHERE ${filters.join(' AND ')}` : '';
   const andClause = filters.length ? `AND ${filters.join(' AND ')}`   : '';
-  const days    = Math.min(Math.max(parseInt(req.query.days, 10) || 14, 1), 90);
+  const days    = daysRaw;
 
   const total    = db.prepare(`SELECT COUNT(*) as n FROM events ${where}`).get(...args).n;
   const sessions = db.prepare(`SELECT COUNT(DISTINCT session_id) as n FROM events ${where}`).get(...args).n;
@@ -310,7 +353,7 @@ app.get('/api/stats', (req, res) => {
   });
 
   const recent = db.prepare(`
-    SELECT * FROM events ${where} ORDER BY id DESC LIMIT 100
+    SELECT * FROM events ${where} ORDER BY id DESC LIMIT 50
   `).all(...args);
 
   const apps = db.prepare(`
@@ -365,7 +408,7 @@ app.get('/api/stats', (req, res) => {
     SELECT DISTINCT platform FROM events WHERE platform IS NOT NULL ORDER BY platform
   `).all().map(r => r.platform);
 
-  res.json({
+  sendJson({
     total, sessions, users, byType, screenTime, funnel, purchaseSessions, conversionRate,
     revenue: Math.round(revenue * 100) / 100,
     aov: Math.round(aov * 100) / 100,

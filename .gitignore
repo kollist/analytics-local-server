@@ -1,4 +1,6 @@
 node_modules/
 *.sqlite
 *.sqlite3
+*.sqlite-wal
+*.sqlite-shm
 .DS_Store

@@ -27,6 +27,14 @@
   }
   .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--green);
          animation: pulse 2s infinite; margin-left: auto; }
+
+  /* top loading bar — visible only while /api/stats is in flight */
+  #loadbar {
+    position: fixed; top: 0; left: 0; height: 2px; width: 100%;
+    background: var(--accent); transform: scaleX(0); transform-origin: left;
+    transition: transform .2s ease, opacity .3s ease; opacity: 0; z-index: 300;
+  }
+  body.loading #loadbar { transform: scaleX(0.8); opacity: 1; transition: transform 8s ease, opacity .1s; }
   @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.3} }
   .live-label { font-size: 12px; color: var(--green); }
 
@@ -164,6 +172,8 @@
 </style>
 </head>
 <body>
+
+<div id="loadbar"></div>
 
 <header>
   <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#6c63ff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -893,17 +903,40 @@ function currentDays() {
   return document.getElementById('days-filter').value;
 }
 
-async function load() {
-  const appSlug = currentApp();
-  const platform = currentPlatform();
-  const params = new URLSearchParams();
-  if (appSlug) params.set('app_slug', appSlug);
-  if (platform) params.set('platform', platform);
-  params.set('days', currentDays());
-  const r = await fetch('/api/stats?' + params.toString());
-  const s = await r.json();
-  renderStats(s);
+// Paint the last response we saw for this exact filter combo straight away, so
+// reopening the dashboard shows numbers instantly instead of a wall of "—"
+// while the (sometimes slow, remote) /api/stats round-trip is in flight. The
+// fresh data replaces it a moment later.
+function statsKey() {
+  return `stats:${currentApp()}|${currentPlatform()}|${currentDays()}`;
 }
+function paintCached() {
+  try {
+    const raw = localStorage.getItem(statsKey());
+    if (raw) { renderStats(JSON.parse(raw)); return true; }
+  } catch {}
+  return false;
+}
+
+let loadSeq = 0;
+async function load() {
+  const mySeq = ++loadSeq;
+  document.body.classList.add('loading');
+  try {
+    const params = new URLSearchParams();
+    if (currentApp()) params.set('app_slug', currentApp());
+    if (currentPlatform()) params.set('platform', currentPlatform());
+    params.set('days', currentDays());
+    const r = await fetch('/api/stats?' + params.toString());
+    const s = await r.json();
+    if (mySeq !== loadSeq) return; // a newer filter change already superseded this
+    renderStats(s);
+    try { localStorage.setItem(statsKey(), JSON.stringify(s)); } catch {}
+  } finally {
+    if (mySeq === loadSeq) document.body.classList.remove('loading');
+  }
+}
+paintCached();
 load();
 setInterval(load, 10000); // refresh stats every 10s
 
@@ -929,14 +962,19 @@ function connectStream() {
 connectStream();
 
 document.getElementById('app-filter').addEventListener('change', () => {
+  paintCached();
   load();
   connectStream();
 });
 document.getElementById('platform-filter').addEventListener('change', () => {
+  paintCached();
   load();
   connectStream();
 });
-document.getElementById('days-filter').addEventListener('change', load);
+document.getElementById('days-filter').addEventListener('change', () => {
+  paintCached();
+  load();
+});
 </script>
 </body>
 </html>
