@@ -6,9 +6,9 @@
   ],
   "bundlePrefix": "com.zaytech",
   "counts": {
-    "excluded": 211,
+    "excluded": 212,
     "unpublishedInJson": 194,
-    "manualInternal": 7,
+    "manualInternal": 8,
     "ascChecked": 425,
     "ascRemovedFromSale": 133,
     "ascUnmapped": 14,
@@ -218,6 +218,7 @@
     "twistedcompassbrewing",
     "twistedindian",
     "uniqpizza",
+    "vcc",
     "vcc.fl",
     "vcc926",
     "vccfl",
@@ -984,6 +985,9 @@
     ],
     "kettlebagels": [
       "asc:removed-from-sale(unmapped)"
+    ],
+    "vcc": [
+      "manual:internal-app"
     ]
   },
   "ascUnmapped": [
