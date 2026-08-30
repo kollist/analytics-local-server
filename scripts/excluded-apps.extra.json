@@ -1,0 +1,12 @@
+{
+  "_comment": "Manual always-exclude list: internal / sandbox / template builds that are not merchant apps. Unioned into excluded-apps.json by sync-excluded-apps.js. These slugs are derived from bundle IDs (com.zaytech.<x>) and the app's APP_SLUG build setting - verify them against the dashboard's app filter and adjust if the real app_slug differs.",
+  "exclude": [
+    "thefoodies",
+    "thefoody",
+    "vcc926",
+    "scanapp",
+    "vccfl",
+    "vcc.fl",
+    "vccsandbox"
+  ]
+}

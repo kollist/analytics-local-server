@@ -50,7 +50,7 @@
   .card h2 .h2-note { text-transform: none; letter-spacing: 0; color: var(--muted); font-weight: 400; font-size: 11px; }
 
   .row { display: grid; gap: 16px; }
-  .kpis   { grid-template-columns: repeat(6, 1fr); }
+  .kpis   { grid-template-columns: repeat(7, 1fr); }
   .cols-3 { grid-template-columns: 1fr 1fr 1fr; }
   .cols-2 { grid-template-columns: 3fr 2fr; }
   @media (max-width: 1100px) { .kpis { grid-template-columns: repeat(3,1fr); } .cols-3, .cols-2 { grid-template-columns: 1fr; } }
@@ -61,6 +61,7 @@
   .kpi .value { font-size: 28px; font-weight: 700; margin-top: 4px; line-height: 1.1; }
   .kpi .delta { font-size: 11px; margin-top: 6px; display: inline-block; }
   .kpi .delta .delta-tail { color: var(--muted); }
+  .kpi .kpi-sub { font-size: 11px; margin-top: 6px; display: inline-block; color: var(--muted); }
   .delta.good { color: var(--green); }
   .delta.bad  { color: var(--red); }
   .delta.flat { color: var(--muted); }
@@ -218,6 +219,7 @@
   <!-- KPI strip -->
   <div class="row kpis">
     <div class="card kpi"><div class="label">Orders</div><div class="value" id="k-orders">—</div><div id="k-orders-d"></div></div>
+    <div class="card kpi"><div class="label">Orders / day</div><div class="value" id="k-opd">—</div><div id="k-opd-d"></div></div>
     <div class="card kpi"><div class="label">GMV</div><div class="value" id="k-gmv">—</div><div id="k-gmv-d"></div></div>
     <div class="card kpi"><div class="label">Conversion</div><div class="value" id="k-conv">—</div><div id="k-conv-d"></div></div>
     <div class="card kpi"><div class="label">Avg Order Value</div><div class="value" id="k-aov">—</div><div id="k-aov-d"></div></div>
@@ -701,6 +703,12 @@ function renderStats(s) {
     if (dHtml !== undefined) document.getElementById(id + '-d').innerHTML = dHtml;
   };
   set('k-orders', fmtInt(orders), deltaHTML(orders, p.orders, 'rel', true));
+  const opd = s.ordersPerDay || {};
+  const perDay = v => (v >= 100 ? fmtInt(v) : (v || 0).toFixed(1));
+  set('k-opd', opd.allTime != null ? perDay(opd.allTime) : '—',
+    opd.allTime != null
+      ? `<span class="kpi-sub">all-time avg · ${perDay(opd.window || 0)}/day in window${opd.excludedApps ? ` · ${opd.excludedApps} removed apps excluded` : ''}</span>`
+      : '');
   set('k-gmv', fmtMoney(gmv), deltaHTML(gmv, p.gmv, 'rel', true));
   set('k-conv', fmtPct(conv), deltaHTML(conv, p.conversion, 'pp', true));
   set('k-aov', fmtMoneyFull(aov), deltaHTML(aov, p.aov, 'rel', true));

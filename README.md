@@ -25,6 +25,41 @@ Advanced → Node.js → environment variables).
   begin_checkout → purchase`. `place_order_tapped` is left out — only ~15% of
   purchases emit it.
 
+## Removed-from-sale apps
+
+Apps pulled from the App Store shouldn't drag down the "all apps" order metrics
+(most have zero orders). `scripts/sync-excluded-apps.js` builds the exclusion
+list from App Store Connect (an app available in zero territories is removed
+from sale) plus `merchants.json` (a slug flagged `unpublished` with no ASC
+record is fully deleted), and writes it to `<analytics-data>/excluded-apps.json`.
+
+```bash
+# needs ASC_KEY_ID / ASC_ISSUER_ID / ASC_API_KEY_CONTENT (see branded-apps/.env.local)
+# and MERCHANTS_JSON pointing at the branded-apps merchants.json
+MERCHANTS_JSON=/path/to/merchants.json node scripts/sync-excluded-apps.js
+```
+
+The Aug-2026 scan found `merchants.json`'s `unpublished` flag to be exact —
+every one of the 194 unpublished merchants is removed from sale in ASC, and no
+published merchant is — so `--no-asc` (merchants.json only, no credentials) is a
+fine daily mode; run the full ASC pass occasionally to catch apps removed since
+the file was last updated and the few whose bundle id no longer maps to a slug.
+
+Two hand-maintained lists live next to the script:
+`excluded-apps.extra.json` `{ "exclude": [...] }` — internal / sandbox / template
+builds (The Foodies, Zaytech Academy/Scanner, VCC FL, `vccsandbox`, …) that are
+not merchants; `excluded-apps.keep.json` `{ "keep": [...] }` — removed apps whose
+orders should still count (currently empty). The keep-list wins.
+
+Run the sync on a schedule (cron / a routine). The dashboard re-reads the result
+at most once a minute, preferring `<analytics-data>/excluded-apps.json` and
+falling back to a checked-in `excluded-apps.json` at the repo root. With no file
+present nothing is excluded. Selecting a single app in the dashboard filter
+always shows that app's real numbers, removed or not; the exclusion only applies
+to the all-apps aggregate and the leaderboard. The **Orders / day** KPI is the
+all-time average (total purchases over the days they span), also filtered this
+way.
+
 ## Architecture note
 
 The dashboard aggregation runs in a worker thread (`analytics-worker.js` +

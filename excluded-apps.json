@@ -1,0 +1,1061 @@
+{
+  "generatedAt": "2026-08-30T22:32:52.417Z",
+  "sources": [
+    "merchants.json:unpublished",
+    "appStoreConnect:appAvailabilityV2"
+  ],
+  "bundlePrefix": "com.zaytech",
+  "counts": {
+    "excluded": 211,
+    "unpublishedInJson": 194,
+    "manualInternal": 7,
+    "ascChecked": 425,
+    "ascRemovedFromSale": 133,
+    "ascUnmapped": 14,
+    "kept": 0
+  },
+  "excluded": [
+    "KawaiiToriSushi",
+    "XurroApp",
+    "aagorestaurant",
+    "aceofwings",
+    "ajodhya",
+    "aldo",
+    "alfredas",
+    "alhamra",
+    "all",
+    "altoscocinay",
+    "americanitalia",
+    "anthonyspizza",
+    "aroma",
+    "aromaof",
+    "bagelbiz",
+    "bageluniversity",
+    "bahiabowls",
+    "bellaserapizz",
+    "benjamins",
+    "biryanibistro",
+    "bistrokabob",
+    "black",
+    "bobbyshawaiia",
+    "bonitafoodmar",
+    "bottomsupespr",
+    "boxcargrillll",
+    "brewandbites",
+    "brooklyn",
+    "bukharaissaquah",
+    "burgerbabyatl",
+    "cactusbubblet",
+    "cajunbento",
+    "cayomango",
+    "centralvalley",
+    "cerritosmexica",
+    "cevichecantina",
+    "chaatandcurry",
+    "chefsenaeast",
+    "chick-n-chuck",
+    "chicknchuck",
+    "churrofactory",
+    "cincotacobar",
+    "comstockbaran",
+    "covo",
+    "cracktacoshop",
+    "crepeschurros",
+    "davidztacos",
+    "dominicksital",
+    "dumplingstogo",
+    "eatatpapis",
+    "eatsubo",
+    "elcomal",
+    "elsinertacos",
+    "eltacoloko",
+    "elysbreakfast",
+    "empanadas-oleaga",
+    "empandasoleaga",
+    "esmeraldas",
+    "fantasticosme",
+    "farm2cook",
+    "filibertosmeximexican",
+    "fitkitchenmod",
+    "fivestarburge",
+    "fonzistacos",
+    "fourtyicecream",
+    "francoswingsn",
+    "getrfriedll",
+    "giantnewyork",
+    "giovannisroas",
+    "gorditos",
+    "grindstonedonu",
+    "gutbustersfood",
+    "gyro",
+    "gyrosonmain",
+    "gyrowings",
+    "halal",
+    "hilalgrill",
+    "ibizaloungean",
+    "indiancurrybo",
+    "infernopizzalounge",
+    "jamesbrew",
+    "javaroma",
+    "jennynicoleso",
+    "juiced",
+    "juliobertosfr",
+    "kashmiri",
+    "kawaiitori",
+    "kazumirestaurant",
+    "kettle",
+    "kettlebagels",
+    "koichatapio",
+    "koisushiraleigh",
+    "konfuciouseats",
+    "labaia",
+    "lacasadelsazon",
+    "lacruda",
+    "lamorenitares",
+    "lamppostpizza",
+    "leegimbap",
+    "lgustocucina",
+    "lolismexicanc",
+    "lupitashotdo",
+    "lw",
+    "maduraikitchen",
+    "mangal",
+    "mangocrazaybr",
+    "mariscoselcat",
+    "masalaexpress",
+    "masalatina",
+    "mightymunchmo",
+    "milk",
+    "misskellyscafe",
+    "moniques",
+    "mos",
+    "mrtaquito",
+    "munch",
+    "munchhut",
+    "mvpitabranded",
+    "neveriachayos",
+    "newportquicks",
+    "nichesandbox",
+    "noodle",
+    "oasisgrill",
+    "ochathairesta",
+    "olivefalafel",
+    "originalgreek",
+    "oscartacoshop",
+    "panteramarket",
+    "panthers",
+    "papalocos",
+    "papapirellis",
+    "pastapronto",
+    "patrona",
+    "phantomsfood",
+    "poshbagel",
+    "prettybird",
+    "prettybirdcoffee",
+    "pretzelhaus",
+    "properpizza",
+    "punjabexpress",
+    "rafastacos",
+    "ranchovillas",
+    "raspalicious",
+    "relish",
+    "rigobertostac",
+    "risenshineco",
+    "rogerspizzero",
+    "rollnrollsus",
+    "rosetealounge",
+    "sahara",
+    "samuraisushi",
+    "scanapp",
+    "selfmadelifestylebar",
+    "sliceofjoy",
+    "slickforkbbq",
+    "smokingmonkey",
+    "sonoratacoshop",
+    "srpcafe",
+    "steaknhoagie",
+    "sticklerscafe",
+    "stockyardresta",
+    "strivefoods",
+    "subcitymaple",
+    "subo",
+    "sushi",
+    "tacarbon",
+    "tacoscalafia",
+    "tacoschilango",
+    "tacoscraft",
+    "tacosdonhecto",
+    "tacoselcompit",
+    "tacoslalomita",
+    "tacosybirria",
+    "taizkabobmedi",
+    "tampastylecub",
+    "tandoorimasala",
+    "taqueriaelmag",
+    "taqueriaeltiz",
+    "taquerialapri",
+    "tasteofkerala",
+    "tastydeli",
+    "the-lunch-lounge",
+    "thecreperie",
+    "thedriveinburgers",
+    "thefoodies",
+    "thefoody",
+    "thelunchlounge",
+    "themug",
+    "thepizzajoint",
+    "thepretzelhaus",
+    "thesensorylab",
+    "thespotcafe",
+    "thesprucejuic",
+    "thetacospot",
+    "tiabicoffee",
+    "tiosbbq",
+    "tostonandmela",
+    "trapvegan",
+    "tresjefez",
+    "tru",
+    "twistedcompassbrewing",
+    "twistedindian",
+    "uniqpizza",
+    "vcc.fl",
+    "vcc926",
+    "vccfl",
+    "vccsandbox",
+    "vecindaddesea",
+    "villaromarestaurant",
+    "wafolcafe",
+    "wessenintlkit"
+  ],
+  "kept": [],
+  "reasons": {
+    "giovannisroas": [
+      "merchants.json:unpublished",
+      "asc:removed-from-sale"
+    ],
+    "covo": [
+      "merchants.json:unpublished",
+      "asc:removed-from-sale"
+    ],
+    "boxcargrillll": [
+      "merchants.json:unpublished",
+      "asc:removed-from-sale"
+    ],
+    "kettle": [
+      "merchants.json:unpublished"
+    ],
+    "rosetealounge": [
+      "merchants.json:unpublished",
+      "asc:removed-from-sale"
+    ],
+    "thespotcafe": [
+      "merchants.json:unpublished"
+    ],
+    "esmeraldas": [
+      "merchants.json:unpublished",
+      "asc:removed-from-sale"
+    ],
+    "elysbreakfast": [
+      "merchants.json:unpublished"
+    ],
+    "halal": [
+      "merchants.json:unpublished"
+    ],
+    "sonoratacoshop": [
+      "merchants.json:unpublished"
+    ],
+    "javaroma": [
+      "merchants.json:unpublished",
+      "asc:removed-from-sale"
+    ],
+    "milk": [
+      "merchants.json:unpublished",
+      "asc:removed-from-sale"
+    ],
+    "ranchovillas": [
+      "merchants.json:unpublished",
+      "asc:removed-from-sale"
+    ],
+    "lamorenitares": [
+      "merchants.json:unpublished",
+      "asc:removed-from-sale"
+    ],
+    "sahara": [
+      "merchants.json:unpublished",
+      "asc:removed-from-sale"
+    ],
+    "cincotacobar": [
+      "merchants.json:unpublished",
+      "asc:removed-from-sale"
+    ],
+    "vecindaddesea": [
+      "merchants.json:unpublished"
+    ],
+    "all": [
+      "merchants.json:unpublished",
+      "asc:removed-from-sale"
+    ],
+    "panthers": [
+      "merchants.json:unpublished",
+      "asc:removed-from-sale"
+    ],
+    "lolismexicanc": [
+      "merchants.json:unpublished",
+      "asc:removed-from-sale"
+    ],
+    "papalocos": [
+      "merchants.json:unpublished"
+    ],
+    "chicknchuck": [
+      "merchants.json:unpublished"
+    ],
+    "tastydeli": [
+      "merchants.json:unpublished"
+    ],
+    "papapirellis": [
+      "merchants.json:unpublished",
+      "asc:removed-from-sale"
+    ],
+    "hilalgrill": [
+      "merchants.json:unpublished",
+      "asc:removed-from-sale"
+    ],
+    "cevichecantina": [
+      "merchants.json:unpublished",
+      "asc:removed-from-sale"
+    ],
+    "punjabexpress": [
+      "merchants.json:unpublished"
+    ],
+    "juliobertosfr": [
+      "merchants.json:unpublished"
+    ],
+    "tru": [
+      "merchants.json:unpublished",
+      "asc:removed-from-sale(unmapped)"
+    ],
+    "munch": [
+      "merchants.json:unpublished"
+    ],
+    "poshbagel": [
+      "merchants.json:unpublished",
+      "asc:removed-from-sale"
+    ],
+    "lupitashotdo": [
+      "merchants.json:unpublished"
+    ],
+    "aromaof": [
+      "merchants.json:unpublished"
+    ],
+    "tacoscalafia": [
+      "merchants.json:unpublished"
+    ],
+    "tresjefez": [
+      "merchants.json:unpublished",
+      "asc:removed-from-sale"
+    ],
+    "burgerbabyatl": [
+      "merchants.json:unpublished",
+      "asc:removed-from-sale"
+    ],
+    "slickforkbbq": [
+      "merchants.json:unpublished",
+      "asc:removed-from-sale"
+    ],
+    "thesensorylab": [
+      "merchants.json:unpublished",
+      "asc:removed-from-sale"
+    ],
+    "bageluniversity": [
+      "merchants.json:unpublished",
+      "asc:removed-from-sale"
+    ],
+    "trapvegan": [
+      "merchants.json:unpublished",
+      "asc:removed-from-sale"
+    ],
+    "aagorestaurant": [
+      "merchants.json:unpublished"
+    ],
+    "tiabicoffee": [
+      "merchants.json:unpublished",
+      "asc:removed-from-sale"
+    ],
+    "samuraisushi": [
+      "merchants.json:unpublished",
+      "asc:removed-from-sale"
+    ],
+    "bottomsupespr": [
+      "merchants.json:unpublished",
+      "asc:removed-from-sale"
+    ],
+    "crepeschurros": [
+      "merchants.json:unpublished",
+      "asc:removed-from-sale"
+    ],
+    "thetacospot": [
+      "merchants.json:unpublished"
+    ],
+    "tandoorimasala": [
+      "merchants.json:unpublished"
+    ],
+    "olivefalafel": [
+      "merchants.json:unpublished",
+      "asc:removed-from-sale"
+    ],
+    "black": [
+      "merchants.json:unpublished"
+    ],
+    "gutbustersfood": [
+      "merchants.json:unpublished",
+      "asc:removed-from-sale"
+    ],
+    "eltacoloko": [
+      "merchants.json:unpublished",
+      "asc:removed-from-sale"
+    ],
+    "elcomal": [
+      "merchants.json:unpublished"
+    ],
+    "tacoselcompit": [
+      "merchants.json:unpublished",
+      "asc:removed-from-sale"
+    ],
+    "thecreperie": [
+      "merchants.json:unpublished",
+      "asc:removed-from-sale"
+    ],
+    "masalaexpress": [
+      "merchants.json:unpublished",
+      "asc:removed-from-sale"
+    ],
+    "labaia": [
+      "merchants.json:unpublished",
+      "asc:removed-from-sale"
+    ],
+    "anthonyspizza": [
+      "merchants.json:unpublished",
+      "asc:removed-from-sale"
+    ],
+    "patrona": [
+      "merchants.json:unpublished",
+      "asc:removed-from-sale"
+    ],
+    "tacosybirria": [
+      "merchants.json:unpublished",
+      "asc:removed-from-sale"
+    ],
+    "uniqpizza": [
+      "merchants.json:unpublished"
+    ],
+    "steaknhoagie": [
+      "merchants.json:unpublished",
+      "asc:removed-from-sale"
+    ],
+    "bahiabowls": [
+      "merchants.json:unpublished"
+    ],
+    "bonitafoodmar": [
+      "merchants.json:unpublished",
+      "asc:removed-from-sale"
+    ],
+    "indiancurrybo": [
+      "merchants.json:unpublished"
+    ],
+    "taqueriaelmag": [
+      "merchants.json:unpublished",
+      "asc:removed-from-sale"
+    ],
+    "tasteofkerala": [
+      "merchants.json:unpublished"
+    ],
+    "fonzistacos": [
+      "merchants.json:unpublished",
+      "asc:removed-from-sale"
+    ],
+    "prettybird": [
+      "merchants.json:unpublished"
+    ],
+    "taqueriaeltiz": [
+      "merchants.json:unpublished"
+    ],
+    "empandasoleaga": [
+      "merchants.json:unpublished"
+    ],
+    "thelunchlounge": [
+      "merchants.json:unpublished"
+    ],
+    "jennynicoleso": [
+      "merchants.json:unpublished",
+      "asc:removed-from-sale"
+    ],
+    "noodle": [
+      "merchants.json:unpublished",
+      "asc:removed-from-sale"
+    ],
+    "tostonandmela": [
+      "merchants.json:unpublished"
+    ],
+    "taizkabobmedi": [
+      "merchants.json:unpublished"
+    ],
+    "jamesbrew": [
+      "merchants.json:unpublished",
+      "asc:removed-from-sale"
+    ],
+    "panteramarket": [
+      "merchants.json:unpublished",
+      "asc:removed-from-sale"
+    ],
+    "pretzelhaus": [
+      "merchants.json:unpublished"
+    ],
+    "aldo": [
+      "merchants.json:unpublished",
+      "asc:removed-from-sale"
+    ],
+    "rigobertostac": [
+      "merchants.json:unpublished",
+      "asc:removed-from-sale"
+    ],
+    "dominicksital": [
+      "merchants.json:unpublished"
+    ],
+    "neveriachayos": [
+      "merchants.json:unpublished"
+    ],
+    "ibizaloungean": [
+      "merchants.json:unpublished"
+    ],
+    "mightymunchmo": [
+      "merchants.json:unpublished",
+      "asc:removed-from-sale"
+    ],
+    "koichatapio": [
+      "merchants.json:unpublished",
+      "asc:removed-from-sale"
+    ],
+    "aceofwings": [
+      "merchants.json:unpublished",
+      "asc:removed-from-sale"
+    ],
+    "lacruda": [
+      "merchants.json:unpublished",
+      "asc:removed-from-sale"
+    ],
+    "biryanibistro": [
+      "merchants.json:unpublished"
+    ],
+    "eatatpapis": [
+      "merchants.json:unpublished",
+      "asc:removed-from-sale"
+    ],
+    "wessenintlkit": [
+      "merchants.json:unpublished"
+    ],
+    "wafolcafe": [
+      "merchants.json:unpublished",
+      "asc:removed-from-sale"
+    ],
+    "chefsenaeast": [
+      "merchants.json:unpublished"
+    ],
+    "oscartacoshop": [
+      "merchants.json:unpublished"
+    ],
+    "alfredas": [
+      "merchants.json:unpublished",
+      "asc:removed-from-sale"
+    ],
+    "originalgreek": [
+      "merchants.json:unpublished",
+      "asc:removed-from-sale"
+    ],
+    "grindstonedonu": [
+      "merchants.json:unpublished",
+      "asc:removed-from-sale"
+    ],
+    "strivefoods": [
+      "merchants.json:unpublished",
+      "asc:removed-from-sale"
+    ],
+    "mvpitabranded": [
+      "merchants.json:unpublished",
+      "asc:removed-from-sale"
+    ],
+    "mrtaquito": [
+      "merchants.json:unpublished",
+      "asc:removed-from-sale"
+    ],
+    "themug": [
+      "merchants.json:unpublished",
+      "asc:removed-from-sale"
+    ],
+    "selfmadelifestylebar": [
+      "merchants.json:unpublished",
+      "asc:removed-from-sale"
+    ],
+    "gyrosonmain": [
+      "merchants.json:unpublished",
+      "asc:removed-from-sale"
+    ],
+    "sliceofjoy": [
+      "merchants.json:unpublished",
+      "asc:removed-from-sale"
+    ],
+    "thedriveinburgers": [
+      "merchants.json:unpublished",
+      "asc:removed-from-sale"
+    ],
+    "thesprucejuic": [
+      "merchants.json:unpublished",
+      "asc:removed-from-sale"
+    ],
+    "lamppostpizza": [
+      "merchants.json:unpublished"
+    ],
+    "rafastacos": [
+      "merchants.json:unpublished",
+      "asc:removed-from-sale"
+    ],
+    "altoscocinay": [
+      "merchants.json:unpublished"
+    ],
+    "twistedindian": [
+      "merchants.json:unpublished",
+      "asc:removed-from-sale"
+    ],
+    "ajodhya": [
+      "merchants.json:unpublished",
+      "asc:removed-from-sale"
+    ],
+    "thepizzajoint": [
+      "merchants.json:unpublished",
+      "asc:removed-from-sale"
+    ],
+    "lgustocucina": [
+      "merchants.json:unpublished"
+    ],
+    "masalatina": [
+      "merchants.json:unpublished"
+    ],
+    "churrofactory": [
+      "merchants.json:unpublished"
+    ],
+    "nichesandbox": [
+      "merchants.json:unpublished"
+    ],
+    "juiced": [
+      "merchants.json:unpublished"
+    ],
+    "comstockbaran": [
+      "merchants.json:unpublished"
+    ],
+    "sushi": [
+      "merchants.json:unpublished"
+    ],
+    "cracktacoshop": [
+      "merchants.json:unpublished"
+    ],
+    "bagelbiz": [
+      "merchants.json:unpublished"
+    ],
+    "giantnewyork": [
+      "merchants.json:unpublished"
+    ],
+    "sticklerscafe": [
+      "merchants.json:unpublished"
+    ],
+    "tacosdonhecto": [
+      "merchants.json:unpublished",
+      "asc:removed-from-sale"
+    ],
+    "cerritosmexica": [
+      "merchants.json:unpublished",
+      "asc:removed-from-sale"
+    ],
+    "fivestarburge": [
+      "merchants.json:unpublished",
+      "asc:removed-from-sale"
+    ],
+    "mangocrazaybr": [
+      "merchants.json:unpublished"
+    ],
+    "benjamins": [
+      "merchants.json:unpublished"
+    ],
+    "fantasticosme": [
+      "merchants.json:unpublished"
+    ],
+    "centralvalley": [
+      "merchants.json:unpublished",
+      "asc:removed-from-sale"
+    ],
+    "cayomango": [
+      "merchants.json:unpublished"
+    ],
+    "kawaiitori": [
+      "merchants.json:unpublished"
+    ],
+    "brewandbites": [
+      "merchants.json:unpublished"
+    ],
+    "rollnrollsus": [
+      "merchants.json:unpublished",
+      "asc:removed-from-sale"
+    ],
+    "phantomsfood": [
+      "merchants.json:unpublished",
+      "asc:removed-from-sale"
+    ],
+    "cajunbento": [
+      "merchants.json:unpublished",
+      "asc:removed-from-sale"
+    ],
+    "konfuciouseats": [
+      "merchants.json:unpublished",
+      "asc:removed-from-sale"
+    ],
+    "stockyardresta": [
+      "merchants.json:unpublished"
+    ],
+    "kazumirestaurant": [
+      "merchants.json:unpublished",
+      "asc:removed-from-sale"
+    ],
+    "mos": [
+      "merchants.json:unpublished",
+      "asc:removed-from-sale"
+    ],
+    "kashmiri": [
+      "merchants.json:unpublished",
+      "asc:removed-from-sale"
+    ],
+    "risenshineco": [
+      "merchants.json:unpublished",
+      "asc:removed-from-sale"
+    ],
+    "alhamra": [
+      "merchants.json:unpublished",
+      "asc:removed-from-sale"
+    ],
+    "tacoschilango": [
+      "merchants.json:unpublished"
+    ],
+    "fitkitchenmod": [
+      "merchants.json:unpublished",
+      "asc:removed-from-sale"
+    ],
+    "taquerialapri": [
+      "merchants.json:unpublished",
+      "asc:removed-from-sale"
+    ],
+    "francoswingsn": [
+      "merchants.json:unpublished",
+      "asc:removed-from-sale"
+    ],
+    "raspalicious": [
+      "merchants.json:unpublished"
+    ],
+    "fourtyicecream": [
+      "merchants.json:unpublished"
+    ],
+    "srpcafe": [
+      "merchants.json:unpublished",
+      "asc:removed-from-sale"
+    ],
+    "moniques": [
+      "merchants.json:unpublished"
+    ],
+    "chaatandcurry": [
+      "merchants.json:unpublished",
+      "asc:removed-from-sale"
+    ],
+    "mariscoselcat": [
+      "merchants.json:unpublished",
+      "asc:removed-from-sale"
+    ],
+    "brooklyn": [
+      "merchants.json:unpublished",
+      "asc:removed-from-sale"
+    ],
+    "elsinertacos": [
+      "merchants.json:unpublished",
+      "asc:removed-from-sale"
+    ],
+    "maduraikitchen": [
+      "merchants.json:unpublished"
+    ],
+    "cactusbubblet": [
+      "merchants.json:unpublished",
+      "asc:removed-from-sale"
+    ],
+    "tampastylecub": [
+      "merchants.json:unpublished",
+      "asc:removed-from-sale"
+    ],
+    "newportquicks": [
+      "merchants.json:unpublished",
+      "asc:removed-from-sale"
+    ],
+    "eatsubo": [
+      "merchants.json:unpublished"
+    ],
+    "oasisgrill": [
+      "merchants.json:unpublished",
+      "asc:removed-from-sale"
+    ],
+    "leegimbap": [
+      "merchants.json:unpublished"
+    ],
+    "koisushiraleigh": [
+      "merchants.json:unpublished"
+    ],
+    "gyrowings": [
+      "merchants.json:unpublished",
+      "asc:removed-from-sale"
+    ],
+    "lw": [
+      "merchants.json:unpublished",
+      "asc:removed-from-sale"
+    ],
+    "dumplingstogo": [
+      "merchants.json:unpublished"
+    ],
+    "gyro": [
+      "merchants.json:unpublished",
+      "asc:removed-from-sale"
+    ],
+    "getrfriedll": [
+      "merchants.json:unpublished",
+      "asc:removed-from-sale"
+    ],
+    "bobbyshawaiia": [
+      "merchants.json:unpublished",
+      "asc:removed-from-sale"
+    ],
+    "tiosbbq": [
+      "merchants.json:unpublished",
+      "asc:removed-from-sale"
+    ],
+    "tacarbon": [
+      "merchants.json:unpublished",
+      "asc:removed-from-sale"
+    ],
+    "properpizza": [
+      "merchants.json:unpublished"
+    ],
+    "rogerspizzero": [
+      "merchants.json:unpublished",
+      "asc:removed-from-sale"
+    ],
+    "pastapronto": [
+      "merchants.json:unpublished",
+      "asc:removed-from-sale"
+    ],
+    "relish": [
+      "merchants.json:unpublished"
+    ],
+    "bistrokabob": [
+      "merchants.json:unpublished"
+    ],
+    "tacoscraft": [
+      "merchants.json:unpublished"
+    ],
+    "davidztacos": [
+      "merchants.json:unpublished",
+      "asc:removed-from-sale"
+    ],
+    "bellaserapizz": [
+      "merchants.json:unpublished"
+    ],
+    "americanitalia": [
+      "merchants.json:unpublished",
+      "asc:removed-from-sale"
+    ],
+    "subcitymaple": [
+      "merchants.json:unpublished",
+      "asc:removed-from-sale"
+    ],
+    "mangal": [
+      "merchants.json:unpublished",
+      "asc:removed-from-sale"
+    ],
+    "ochathairesta": [
+      "merchants.json:unpublished",
+      "asc:removed-from-sale"
+    ],
+    "smokingmonkey": [
+      "merchants.json:unpublished",
+      "asc:removed-from-sale"
+    ],
+    "filibertosmeximexican": [
+      "merchants.json:unpublished",
+      "asc:removed-from-sale"
+    ],
+    "tacoslalomita": [
+      "merchants.json:unpublished"
+    ],
+    "aroma": [
+      "merchants.json:unpublished",
+      "asc:removed-from-sale"
+    ],
+    "bukharaissaquah": [
+      "merchants.json:unpublished",
+      "asc:removed-from-sale"
+    ],
+    "infernopizzalounge": [
+      "merchants.json:unpublished",
+      "asc:removed-from-sale"
+    ],
+    "farm2cook": [
+      "merchants.json:unpublished",
+      "asc:removed-from-sale"
+    ],
+    "gorditos": [
+      "merchants.json:unpublished",
+      "asc:removed-from-sale"
+    ],
+    "lacasadelsazon": [
+      "merchants.json:unpublished",
+      "asc:removed-from-sale"
+    ],
+    "misskellyscafe": [
+      "merchants.json:unpublished",
+      "asc:removed-from-sale(unmapped)"
+    ],
+    "twistedcompassbrewing": [
+      "merchants.json:unpublished",
+      "asc:removed-from-sale"
+    ],
+    "villaromarestaurant": [
+      "merchants.json:unpublished",
+      "asc:removed-from-sale"
+    ],
+    "thefoodies": [
+      "manual:internal-app"
+    ],
+    "thefoody": [
+      "manual:internal-app"
+    ],
+    "vcc926": [
+      "manual:internal-app"
+    ],
+    "scanapp": [
+      "manual:internal-app",
+      "asc:removed-from-sale(unmapped)"
+    ],
+    "vccfl": [
+      "manual:internal-app"
+    ],
+    "vcc.fl": [
+      "manual:internal-app",
+      "asc:removed-from-sale(unmapped)"
+    ],
+    "vccsandbox": [
+      "manual:internal-app"
+    ],
+    "XurroApp": [
+      "asc:removed-from-sale(unmapped)"
+    ],
+    "chick-n-chuck": [
+      "asc:removed-from-sale(unmapped)"
+    ],
+    "the-lunch-lounge": [
+      "asc:removed-from-sale(unmapped)"
+    ],
+    "prettybirdcoffee": [
+      "asc:removed-from-sale(unmapped)"
+    ],
+    "KawaiiToriSushi": [
+      "asc:removed-from-sale(unmapped)"
+    ],
+    "subo": [
+      "asc:removed-from-sale(unmapped)"
+    ],
+    "thepretzelhaus": [
+      "asc:removed-from-sale(unmapped)"
+    ],
+    "empanadas-oleaga": [
+      "asc:removed-from-sale(unmapped)"
+    ],
+    "munchhut": [
+      "asc:removed-from-sale(unmapped)"
+    ],
+    "kettlebagels": [
+      "asc:removed-from-sale(unmapped)"
+    ]
+  },
+  "ascUnmapped": [
+    {
+      "bundle": "com.misskellyscafe",
+      "name": "Miss Kelly's Cafe",
+      "slugGuess": "misskellyscafe"
+    },
+    {
+      "bundle": "com.zaytech.XurroApp",
+      "name": "Churro Xurro Factory",
+      "slugGuess": "XurroApp"
+    },
+    {
+      "bundle": "com.zaytech.chick-n-chuck",
+      "name": "Chick N Chuck",
+      "slugGuess": "chick-n-chuck"
+    },
+    {
+      "bundle": "com.zaytech.the-lunch-lounge",
+      "name": "The Lunch Lounge",
+      "slugGuess": "the-lunch-lounge"
+    },
+    {
+      "bundle": "com.zaytech.prettybirdcoffee",
+      "name": "Pretty Bird Coffee",
+      "slugGuess": "prettybirdcoffee"
+    },
+    {
+      "bundle": "com.zaytech.KawaiiToriSushi",
+      "name": "Kawaii Tori Sushi",
+      "slugGuess": "KawaiiToriSushi"
+    },
+    {
+      "bundle": "com.zaytech.subo",
+      "name": "SūBó Sushi Burritos",
+      "slugGuess": "subo"
+    },
+    {
+      "bundle": "com.zaytech.thepretzelhaus",
+      "name": "The Pretzel Haus",
+      "slugGuess": "thepretzelhaus"
+    },
+    {
+      "bundle": "com.zaytech.empanadas-oleaga",
+      "name": "Empanadas Oleaga",
+      "slugGuess": "empanadas-oleaga"
+    },
+    {
+      "bundle": "com.zaytech.munchhut",
+      "name": "Munch Hut",
+      "slugGuess": "munchhut"
+    },
+    {
+      "bundle": "com.zaytech.kettlebagels",
+      "name": "Kettle Bagels",
+      "slugGuess": "kettlebagels"
+    },
+    {
+      "bundle": "com.zaytech.vcc.fl",
+      "name": "VCC FL",
+      "slugGuess": "vcc.fl"
+    },
+    {
+      "bundle": "com.zaytech.tru",
+      "name": "TRU SOUL FOOD",
+      "slugGuess": "tru"
+    },
+    {
+      "bundle": "com.zaytech.scanapp",
+      "name": "Zaytech Scanner",
+      "slugGuess": "scanapp"
+    }
+  ]
+}

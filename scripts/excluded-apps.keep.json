@@ -1,0 +1,4 @@
+{
+  "_comment": "app_slugs to KEEP counting in the dashboard order metrics even though App Store Connect reports them removed from sale. Edit the keep array.",
+  "keep": []
+}
