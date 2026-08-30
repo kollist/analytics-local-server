@@ -205,9 +205,10 @@
   <select id="platform-filter"><option value="">All platforms</option></select>
   <select id="days-filter">
     <option value="7">Last 7 days</option>
-    <option value="14" selected>Last 14 days</option>
-    <option value="30">Last 30 days</option>
+    <option value="30" selected>Last 30 days</option>
     <option value="90">Last 90 days</option>
+    <option value="365">Last 365 days</option>
+    <option value="">All time</option>
   </select>
   <a class="nav-link" href="/errors.html">Errors &rarr;</a>
   <div class="live"><span class="live-label">LIVE</span><span class="dot"></span></div>
@@ -375,7 +376,8 @@ function deltaHTML(cur, prev, mode, goodUp = true) {
     txt = `${d >= 0 ? '▲' : '▼'} ${Math.abs(d).toFixed(0)}%`;
   }
   const cls = Math.abs(d) < 1e-9 ? 'flat' : ((d >= 0) === goodUp ? 'good' : 'bad');
-  return `<span class="delta ${cls}">${txt}<span class="delta-tail"> vs prev ${currentDays()}d</span></span>`;
+  const tail = currentDays() ? ` vs prev ${currentDays()}d` : ' vs prev period';
+  return `<span class="delta ${cls}">${txt}<span class="delta-tail">${tail}</span></span>`;
 }
 
 // ── Trend charts (hand-rolled SVG) ─────────────────────────────────────────
@@ -702,18 +704,23 @@ function renderStats(s) {
     document.getElementById(id).textContent = val;
     if (dHtml !== undefined) document.getElementById(id + '-d').innerHTML = dHtml;
   };
-  set('k-orders', fmtInt(orders), deltaHTML(orders, p.orders, 'rel', true));
+  // no period-over-period for the "all time" window
+  const d = s.prev ? deltaHTML : () => '';
+  set('k-orders', fmtInt(orders), d(orders, p.orders, 'rel', true));
   const opd = s.ordersPerDay || {};
   const perDay = v => (v >= 100 ? fmtInt(v) : (v || 0).toFixed(1));
+  const opdSub = opd.window != null
+    ? `all-time avg · ${perDay(opd.window)}/day in window`
+    : `avg over ${fmtInt(opd.spanDays || 0)} days`;
   set('k-opd', opd.allTime != null ? perDay(opd.allTime) : '—',
     opd.allTime != null
-      ? `<span class="kpi-sub">all-time avg · ${perDay(opd.window || 0)}/day in window${opd.excludedApps ? ` · ${opd.excludedApps} removed apps excluded` : ''}</span>`
+      ? `<span class="kpi-sub">${opdSub}${opd.excludedApps ? ` · ${opd.excludedApps} removed apps excluded` : ''}</span>`
       : '');
-  set('k-gmv', fmtMoney(gmv), deltaHTML(gmv, p.gmv, 'rel', true));
-  set('k-conv', fmtPct(conv), deltaHTML(conv, p.conversion, 'pp', true));
-  set('k-aov', fmtMoneyFull(aov), deltaHTML(aov, p.aov, 'rel', true));
-  set('k-crash', fmtPct(crash), deltaHTML(crash, p.crashFreePct, 'pp', true));
-  set('k-new', fmtInt(newU), deltaHTML(newU, p.newUsers, 'rel', true));
+  set('k-gmv', fmtMoney(gmv), d(gmv, p.gmv, 'rel', true));
+  set('k-conv', fmtPct(conv), d(conv, p.conversion, 'pp', true));
+  set('k-aov', fmtMoneyFull(aov), d(aov, p.aov, 'rel', true));
+  set('k-crash', fmtPct(crash), d(crash, p.crashFreePct, 'pp', true));
+  set('k-new', fmtInt(newU), d(newU, p.newUsers, 'rel', true));
 
   const appName = currentApp() || 'all apps';
   document.getElementById('window-label').textContent = `${s.windowLabel || 'last ' + currentDays() + ' days'} · ${appName}`;

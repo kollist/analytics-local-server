@@ -356,7 +356,9 @@ app.get('/api/stats', async (req, res) => {
   const params = {
     appSlug: req.query.app_slug || null,
     platform: req.query.platform || null,
-    days: Math.min(Math.max(parseInt(req.query.days, 10) || 14, 1), 90),
+    // `days=` (explicit empty) → all time; missing → 30; otherwise clamp to [1, 365]
+    days: req.query.days === '' ? null
+      : Math.min(Math.max(parseInt(req.query.days, 10) || 30, 1), 365),
   };
   try {
     res.json(await getCached('stats', params));
@@ -386,8 +388,8 @@ app.get('/api/errors', async (req, res) => {
 function warmCaches() {
   if (!indexesReady || !worker) return;
   Promise.allSettled([
-    getCached('stats', { appSlug: null, platform: null, days: 14 }),
     getCached('stats', { appSlug: null, platform: null, days: 30 }),
+    getCached('stats', { appSlug: null, platform: null, days: 90 }),
     getCached('errors', { appSlug: null, platform: null, days: 30, limit: 50, offset: 0, type: null }),
   ]);
 }
