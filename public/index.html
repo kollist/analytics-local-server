@@ -26,6 +26,10 @@
   .nav-link { color: var(--accent); text-decoration: none; font-size: 13px; font-weight: 600;
               border: 1px solid var(--border); border-radius: 6px; padding: 5px 10px; }
   .nav-link:hover { background: rgba(108,99,255,.12); }
+  .help-btn { display: inline-flex; align-items: center; gap: 5px; text-decoration: none;
+              background: var(--accent); color: #fff; font-size: 13px; font-weight: 600;
+              border: 1px solid var(--accent); border-radius: 6px; padding: 5px 11px; }
+  .help-btn:hover { background: #5a51e6; }
   select {
     background: var(--surface-2); color: var(--text); border: 1px solid var(--border);
     border-radius: 6px; padding: 5px 8px; font-family: inherit; font-size: 13px;
@@ -211,8 +215,11 @@
     <option value="">All time</option>
   </select>
   <a class="nav-link" href="/errors.html">Errors &rarr;</a>
-  <a class="nav-link" href="/docs.html">Docs</a>
   <div class="live"><span class="live-label">LIVE</span><span class="dot"></span></div>
+  <a class="help-btn" href="/docs.html" title="What every number on this page means">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+    Metrics Guide
+  </a>
 </header>
 
 <main>
