@@ -1,0 +1,483 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Metrics Guide · Analytics</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg: #0f1117; --surface: #1a1d27; --surface-2: #21242f; --border: #2a2d3a;
+    --accent: #6c63ff; --green: #22c55e; --yellow: #f59e0b;
+    --red: #ef4444; --text: #e2e8f0; --muted: #64748b;
+    --font: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    --mono: ui-monospace, SFMono-Regular, Menlo, monospace;
+  }
+  body { background: var(--bg); color: var(--text); font-family: var(--font); font-size: 14px; line-height: 1.6; }
+  a { color: var(--accent); }
+
+  header {
+    background: var(--surface); border-bottom: 1px solid var(--border);
+    padding: 14px 24px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+    position: sticky; top: 0; z-index: 50;
+  }
+  header h1 { font-size: 16px; font-weight: 700; margin-right: 4px; }
+  .nav-link { color: var(--accent); text-decoration: none; font-size: 13px; font-weight: 600;
+              border: 1px solid var(--border); border-radius: 6px; padding: 5px 10px; }
+  .nav-link:hover { background: rgba(108,99,255,.12); }
+  .spacer { margin-left: auto; }
+
+  main { padding: 24px; max-width: 940px; margin: 0 auto; }
+
+  .lead { color: var(--muted); font-size: 14px; margin-bottom: 28px; }
+
+  .toc {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
+    padding: 16px 20px; margin-bottom: 32px;
+  }
+  .toc h2 { font-size: 11px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); margin-bottom: 10px; }
+  .toc ol { list-style: none; column-count: 2; column-gap: 28px; }
+  .toc li { margin: 3px 0; break-inside: avoid; }
+  @media (max-width: 640px) { .toc ol { column-count: 1; } }
+
+  section { margin-bottom: 40px; scroll-margin-top: 70px; }
+  section > h2 {
+    font-size: 18px; font-weight: 700; margin-bottom: 4px;
+    padding-bottom: 8px; border-bottom: 1px solid var(--border);
+  }
+  section > h2 .anchor { color: var(--muted); font-weight: 400; text-decoration: none; margin-left: 8px; opacity: 0; font-size: 14px; }
+  section > h2:hover .anchor { opacity: 1; }
+  h3 { font-size: 14px; font-weight: 700; margin: 22px 0 6px; }
+  p { margin: 8px 0; }
+  ul, ol.body { margin: 8px 0 8px 22px; }
+  li { margin: 4px 0; }
+
+  code {
+    font-family: var(--mono); font-size: 12.5px; background: var(--surface-2);
+    border: 1px solid var(--border); border-radius: 4px; padding: 1px 5px;
+  }
+  .formula {
+    font-family: var(--mono); font-size: 12.5px; background: var(--surface);
+    border: 1px solid var(--border); border-left: 3px solid var(--accent);
+    border-radius: 6px; padding: 10px 14px; margin: 10px 0; overflow-x: auto;
+    color: var(--text);
+  }
+
+  table { width: 100%; border-collapse: collapse; font-size: 13px; margin: 12px 0; }
+  th { text-align: left; color: var(--muted); font-weight: 600; font-size: 11px;
+       text-transform: uppercase; letter-spacing: .06em;
+       border-bottom: 1px solid var(--border); padding: 8px 10px; vertical-align: top; }
+  td { padding: 8px 10px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  tr:last-child td { border-bottom: none; }
+  td:first-child { white-space: nowrap; font-weight: 600; }
+
+  .note, .warn {
+    border-radius: 8px; padding: 12px 16px; margin: 14px 0; font-size: 13px;
+    border: 1px solid var(--border);
+  }
+  .note { background: rgba(108,99,255,.08); border-color: rgba(108,99,255,.3); }
+  .warn { background: rgba(245,158,11,.08); border-color: rgba(245,158,11,.35); }
+  .note b, .warn b { color: var(--text); }
+
+  .pill { display: inline-block; font-family: var(--mono); font-size: 11.5px;
+          background: var(--surface-2); border: 1px solid var(--border);
+          border-radius: 4px; padding: 1px 6px; color: var(--muted); }
+
+  .faq dt { font-weight: 700; margin-top: 16px; }
+  .faq dd { margin: 4px 0 0; color: var(--text); }
+
+  footer { color: var(--muted); font-size: 12px; border-top: 1px solid var(--border);
+           padding-top: 16px; margin-top: 40px; }
+</style>
+</head>
+<body>
+
+<header>
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#6c63ff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+  </svg>
+  <h1>Metrics Guide</h1>
+  <a class="nav-link" href="/">&larr; Dashboard</a>
+  <a class="nav-link" href="/errors.html">Errors</a>
+</header>
+
+<main>
+
+  <p class="lead">
+    What every number on the dashboard means, how it is calculated, and the gotchas worth knowing
+    before you quote one in a meeting. Everything here is derived from the raw analytics events the
+    apps send &mdash; one database row per event.
+  </p>
+
+  <div class="toc">
+    <h2>Contents</h2>
+    <ol>
+      <li><a href="#data">1. Where the data comes from</a></li>
+      <li><a href="#filters">2. Filters &amp; time windows</a></li>
+      <li><a href="#freshness">3. Data freshness</a></li>
+      <li><a href="#kpis">4. KPI strip</a></li>
+      <li><a href="#deltas">5. The &ldquo;vs previous period&rdquo; deltas</a></li>
+      <li><a href="#trends">6. Trend charts</a></li>
+      <li><a href="#leaderboard">7. App Leaderboard</a></li>
+      <li><a href="#funnel">8. Ordering Funnel</a></li>
+      <li><a href="#checkout">9. Checkout Health</a></li>
+      <li><a href="#topitems">10. Top Items</a></li>
+      <li><a href="#detail">11. Detail section</a></li>
+      <li><a href="#errors">12. Errors page</a></li>
+      <li><a href="#faq">13. FAQ &mdash; likely questions</a></li>
+    </ol>
+  </div>
+
+  <section id="data">
+    <h2>1. Where the data comes from <a class="anchor" href="#data">#</a></h2>
+    <p>
+      The mobile apps send a stream of <b>events</b> (screen views, taps, purchases, errors&hellip;) to this
+      server. Each event is stored as one row with a timestamp, the app, the platform, an anonymous
+      device id, a session id, an event type, and a JSON <code>properties</code> blob.
+    </p>
+    <p>
+      Revenue and order metrics are counted <b>entirely from the <span class="pill">purchase</span> event</b>.
+      Its <code>properties.value</code> is the order total. There is an older <span class="pill">order_placed</span> /
+      <span class="pill">place_order_tapped</span> event that only fires for a minority of orders &mdash; it is
+      deliberately <b>not used in any metric</b>, to avoid undercounting.
+    </p>
+    <h3>Excluded apps</h3>
+    <p>
+      Apps that have been pulled from the App Store, plus internal template / sandbox builds
+      (<span class="pill">vcc</span>, <span class="pill">vccsandbox</span>), are kept out of the
+      <b>&ldquo;All apps&rdquo;</b> aggregate and the leaderboard so they don&rsquo;t drag the averages down. The list is
+      synced from App Store Connect. Selecting a single app from the filter always shows that app&rsquo;s
+      real numbers, excluded or not.
+    </p>
+  </section>
+
+  <section id="filters">
+    <h2>2. Filters &amp; time windows <a class="anchor" href="#filters">#</a></h2>
+    <p>The three dropdowns in the header apply to the whole page:</p>
+    <ul>
+      <li><b>App</b> &mdash; one app, or all apps (excluded apps removed).</li>
+      <li><b>Platform</b> &mdash; iOS / Android / all.</li>
+      <li><b>Time window</b> &mdash; 7, 30, 90, or 365 days, or <b>All time</b>.</li>
+    </ul>
+    <p>
+      A window of <b>N days</b> means events with a timestamp in the last N&times;24 hours, up to now.
+      <b>All time</b> removes the lower bound entirely &mdash; every event ever received.
+    </p>
+    <div class="note">
+      The <b>App Leaderboard ignores the App filter</b> (it always compares every app) but does respect
+      the Platform filter and the time window.
+    </div>
+  </section>
+
+  <section id="freshness">
+    <h2>3. Data freshness <a class="anchor" href="#freshness">#</a></h2>
+    <p>
+      The dashboard reads from a cache in front of the database, so numbers are near-real-time but not
+      to-the-second:
+    </p>
+    <table>
+      <thead><tr><th>Window</th><th>Refresh cadence</th><th>Why</th></tr></thead>
+      <tbody>
+        <tr><td>7 / 30 / 90 days</td><td>continuous, &le; ~30&nbsp;s old</td><td>Cheap to compute; kept permanently warm.</td></tr>
+        <tr><td>365 days / All time</td><td>every ~5 minutes</td><td>These scan the entire events table on every sub-query. Recomputing them on every page poll would saturate the server, and totals at that scale barely move minute to minute.</td></tr>
+      </tbody>
+    </table>
+    <p>
+      When a set of numbers is more than ~90&nbsp;seconds old, the grey subtitle under the header shows
+      <b>&ldquo;updated N&nbsp;m ago&rdquo;</b>. That is expected on the 365-day and All-time views &mdash; it is not an error.
+    </p>
+  </section>
+
+  <section id="kpis">
+    <h2>4. KPI strip <a class="anchor" href="#kpis">#</a></h2>
+    <p>The seven cards at the top of the dashboard. All are for the selected window, app and platform.</p>
+
+    <table>
+      <thead><tr><th>Card</th><th>Definition</th></tr></thead>
+      <tbody>
+        <tr>
+          <td>Orders</td>
+          <td>Number of <span class="pill">purchase</span> events in the window. A session that checks
+              out twice counts as 2 orders.</td>
+        </tr>
+        <tr>
+          <td>Orders / day</td>
+          <td>The <b>big number is always the all-time average</b>: total purchases ever &divide; the number
+              of days between the first and last purchase (respecting the app / platform filter).
+              It does <b>not</b> change when you switch windows &mdash; only the grey subtitle does, which
+              adds the windowed rate (<code>orders in window &divide; days in window</code>). On the All-time
+              view the subtitle just reads &ldquo;avg over N days&rdquo;.</td>
+        </tr>
+        <tr>
+          <td>GMV</td>
+          <td>Gross Merchandise Value &mdash; the sum of <code>properties.value</code> across all
+              <span class="pill">purchase</span> events in the window. Gross: before refunds, fees or
+              cancellations.</td>
+        </tr>
+        <tr>
+          <td>Conversion</td>
+          <td><b>Session-based.</b>
+              <span class="formula">sessions with a purchase &divide; all sessions &times; 100</span>
+              Counted on distinct <code>session_id</code>. Not device-based and not order-based.</td>
+        </tr>
+        <tr>
+          <td>Avg Order Value</td>
+          <td><b>Order-based.</b> <code>GMV &divide; Orders</code> (using the purchase-event count, so
+              consistent with the Orders card).</td>
+        </tr>
+        <tr>
+          <td>Crash-free sessions</td>
+          <td><span class="formula">(1 &minus; sessions with a crash &divide; all sessions) &times; 100</span>
+              A &ldquo;crash&rdquo; is an <span class="pill">app_error</span> event whose
+              <code>properties.type</code> is <code>"crash"</code>. Non-crash errors (network, login)
+              do not affect this number &mdash; see the Errors page for those.</td>
+        </tr>
+        <tr>
+          <td>New users</td>
+          <td>Distinct devices (<code>anonymous_id</code>) active in the window that have <b>no event of
+              any kind before the window started</b> &mdash; i.e. first seen during this window. On the
+              All-time view this equals total users.</td>
+        </tr>
+      </tbody>
+    </table>
+    <div class="note">
+      <b>Sessions vs users vs devices.</b> &ldquo;Sessions&rdquo; are app-open sessions (<code>session_id</code>).
+      &ldquo;Users&rdquo; / &ldquo;devices&rdquo; are <code>anonymous_id</code> &mdash; one per install, not per person. Someone
+      who reinstalls or uses two phones is two users. There is no login-based identity in these metrics.
+    </div>
+  </section>
+
+  <section id="deltas">
+    <h2>5. The &ldquo;vs previous period&rdquo; deltas <a class="anchor" href="#deltas">#</a></h2>
+    <p>
+      The small coloured line under most KPIs (<span style="color:var(--green)">&#9650; 12%</span> /
+      <span style="color:var(--red)">&#9660; 4pp</span>) compares the current window to the
+      <b>equal-length window immediately before it</b>. Last 30 days is compared to the 30 days before that.
+    </p>
+    <ul>
+      <li><b>%</b> &mdash; relative change (<code>(now &minus; before) &divide; before</code>). Used for counts and money.</li>
+      <li><b>pp</b> &mdash; percentage <i>points</i>. Used for Conversion and Crash-free, because a move from
+          2%&nbsp;&rarr;&nbsp;3% is &ldquo;+1pp&rdquo;, not &ldquo;+50%&rdquo;.</li>
+      <li><b>new</b> &mdash; there was no activity in the previous period to compare against.</li>
+      <li>Colour is green when the change is in the good direction for that metric, red otherwise.</li>
+    </ul>
+    <div class="warn">
+      Deltas are <b>hidden entirely on the All-time view</b> &mdash; there is no &ldquo;period before all time&rdquo;.
+    </div>
+  </section>
+
+  <section id="trends">
+    <h2>6. Trend charts <a class="anchor" href="#trends">#</a></h2>
+    <p>The three small charts: Orders/day, Conversion/day, GMV/day. The x-axis bucket size adapts to the window:</p>
+    <table>
+      <thead><tr><th>Span</th><th>Bucket</th></tr></thead>
+      <tbody>
+        <tr><td>up to ~13 weeks</td><td>one bar per day</td></tr>
+        <tr><td>up to ~2 years</td><td>one bar per week (Sunday-anchored)</td></tr>
+        <tr><td>longer</td><td>one bar per month</td></tr>
+      </tbody>
+    </table>
+    <p>The large number in each chart&rsquo;s corner is a summary over the visible buckets:</p>
+    <ul>
+      <li><b>GMV chart</b> &mdash; total revenue across the buckets. Matches the GMV KPI.</li>
+      <li><b>Orders chart</b> &mdash; total <i>sessions that purchased</i> across the buckets. This can be
+          slightly lower than the Orders KPI, which counts purchase <i>events</i> (one session, two
+          purchases = 2 orders but 1 on the chart).</li>
+      <li><b>Conversion chart</b> &mdash; the <b>unweighted average of each bucket&rsquo;s conversion rate</b>.
+          Over a long window with quiet early buckets this can differ noticeably from the Conversion KPI
+          (which is one ratio over the whole window). When they disagree, <b>trust the KPI</b>.</li>
+    </ul>
+    <div class="note">
+      The first and last buckets are usually <b>partial</b> (the window starts mid-week, today is mid-month),
+      so the end bars often look like a dip. That is the bucket being incomplete, not a traffic drop.
+    </div>
+  </section>
+
+  <section id="leaderboard">
+    <h2>7. App Leaderboard <a class="anchor" href="#leaderboard">#</a></h2>
+    <p>Per-app breakdown for the selected window and platform. Always covers every app (the App filter does not apply here); removed / sandbox apps are excluded.</p>
+    <h3>Columns</h3>
+    <table>
+      <tbody>
+        <tr><td>Orders</td><td>Purchase events for that app in the window. The small &#9650;/&#9660; is this window vs the previous equal-length window for that app (hidden on All-time).</td></tr>
+        <tr><td>GMV</td><td>Sum of purchase value for that app.</td></tr>
+        <tr><td>Conv %</td><td>Purchasing sessions &divide; sessions, for that app.</td></tr>
+        <tr><td>AOV</td><td>GMV &divide; orders, for that app.</td></tr>
+        <tr><td>Users</td><td>Distinct devices for that app.</td></tr>
+      </tbody>
+    </table>
+    <h3>Tabs</h3>
+    <ul>
+      <li><b>Top performers</b> &mdash; every app, sortable by any column (default: GMV, high to low).</li>
+      <li><b>Best converting</b> &mdash; apps with <b>at least 30 sessions</b> in the window, ranked by
+          conversion rate, highest first. The 30-session floor keeps a 1-session-1-order app off the top.</li>
+      <li><b>Underperformers</b> &mdash; same 30-session floor, ranked by conversion rate, <i>lowest</i> first.</li>
+    </ul>
+    <p>Click a row to load that app into the page filter; click a column header (Top performers tab) to re-sort.</p>
+  </section>
+
+  <section id="funnel">
+    <h2>8. Ordering Funnel <a class="anchor" href="#funnel">#</a></h2>
+    <p>Five steps on the path to an order. Each bar is the number of <b>distinct sessions in which that event occurred</b> during the window:</p>
+    <table>
+      <thead><tr><th>Step</th><th>Event</th></tr></thead>
+      <tbody>
+        <tr><td>Browse menu</td><td><span class="pill">view_item_list</span></td></tr>
+        <tr><td>View item</td><td><span class="pill">view_item</span></td></tr>
+        <tr><td>Add to cart</td><td><span class="pill">add_to_cart</span></td></tr>
+        <tr><td>Begin checkout</td><td><span class="pill">begin_checkout</span></td></tr>
+        <tr><td>Purchase</td><td><span class="pill">purchase</span></td></tr>
+      </tbody>
+    </table>
+    <h3>The two right-hand columns</h3>
+    <table>
+      <tbody>
+        <tr>
+          <td>Of top</td>
+          <td>This step &divide; the <b>first</b> step (Browse menu). The cumulative share of everyone who
+              entered the funnel that reached this step.</td>
+        </tr>
+        <tr>
+          <td>Step&nbsp;conversion</td>
+          <td>This step &divide; the <b>previous</b> step, shown as <b>&ldquo;X% kept&rdquo;</b> with the number of
+              sessions lost in red, e.g. <span style="color:var(--red)">(&minus;500)</span>. It isolates
+              which single step is leaking. The first row shows <b>&ldquo;entry&rdquo;</b> instead &mdash; it is the top
+              of the funnel, so there is no earlier step to convert from.</td>
+        </tr>
+      </tbody>
+    </table>
+    <p>Example &mdash; Browse&nbsp;1,000 &rarr; View&nbsp;item&nbsp;800 &rarr; Add&nbsp;to&nbsp;cart&nbsp;300:</p>
+    <ul>
+      <li>View item: Of top <b>80%</b>, Step conversion <b>&ldquo;80% kept (&minus;200)&rdquo;</b></li>
+      <li>Add to cart: Of top <b>30%</b>, Step conversion <b>&ldquo;38% kept (&minus;500)&rdquo;</b></li>
+    </ul>
+    <div class="warn">
+      <b>This is not a strict ordered path.</b> Each step just asks &ldquo;did this session ever fire this
+      event in the window&rdquo;. A session that adds to cart without a recorded <span class="pill">view_item</span>
+      still counts in Add&nbsp;to&nbsp;cart. Consequences: &ldquo;Step conversion&rdquo; can read <b>above 100%</b>, and
+      multiplying the step rates together will <b>not</b> exactly equal &ldquo;Of top&rdquo;. Read it as a
+      diagnostic of where drop-off concentrates, not as an exact cohort trace.
+    </div>
+    <p>
+      <span class="pill">place_order_tapped</span> is left out of the funnel on purpose: only ~15% of
+      purchases emit it, which would make the funnel appear to collapse to near-zero and then recover.
+    </p>
+  </section>
+
+  <section id="checkout">
+    <h2>9. Checkout Health <a class="anchor" href="#checkout">#</a></h2>
+    <p>All figures are for the selected window. &ldquo;Started checkouts&rdquo; = distinct sessions with a <span class="pill">begin_checkout</span> event.</p>
+    <table>
+      <tbody>
+        <tr><td>Checkout abandonment</td><td><code>1 &minus; (sessions that purchased &divide; sessions that started checkout)</code>. The subtitle shows the raw &ldquo;X of Y completed&rdquo;.</td></tr>
+        <tr><td>Abandoned cart value</td><td>Sum of <code>properties.cart_value</code> on <span class="pill">checkout_abandoned</span> events; the count is the number of those events.</td></tr>
+        <tr><td>Failed orders</td><td>Count of <span class="pill">order_place_failed</span> events &mdash; payment declined, server error, etc. (Detail on the Errors page.)</td></tr>
+        <tr><td>Checkouts with a coupon</td><td><span class="pill">coupon_applied</span> events &divide; started checkouts (capped at 100%). &ldquo;$X discounted&rdquo; is the sum of <code>properties.discount</code>.</td></tr>
+        <tr><td>Checkouts with a tip</td><td><span class="pill">tip_selected</span> events &divide; started checkouts. &ldquo;avg tip&rdquo; is the mean <code>properties.amount</code>.</td></tr>
+        <tr><td>Order-type selections</td><td>Count of <span class="pill">order_type_selected</span> events. The split bar below is delivery vs pickup, from <code>properties.is_delivery</code>.</td></tr>
+        <tr><td>Payment methods</td><td>Count of <span class="pill">payment_method_selected</span> events grouped by <code>properties.method</code>.</td></tr>
+      </tbody>
+    </table>
+    <div class="note">
+      Coupon / tip rates are counted as <i>events per started checkout</i>, so a session that applies a
+      coupon twice is counted twice (hence the 100% cap). Treat them as directional.
+    </div>
+  </section>
+
+  <section id="topitems">
+    <h2>10. Top Items <a class="anchor" href="#topitems">#</a></h2>
+    <p>
+      The 15 products with the most <span class="pill">add_to_cart</span> events in the window, by
+      <code>properties.product_name</code>. Columns: total add-to-carts, the number of distinct sessions
+      that added it, and the average <code>properties.price</code> seen. This is an <b>interest</b> signal
+      (adds), not a sales-by-item report &mdash; it does not track whether the cart converted.
+    </p>
+  </section>
+
+  <section id="detail">
+    <h2>11. Detail section <a class="anchor" href="#detail">#</a></h2>
+    <p>The collapsed <b>&ldquo;Detail&rdquo;</b> block at the bottom:</p>
+    <ul>
+      <li><b>Events by type</b> &mdash; raw count of every event type in the window, grouped by category.
+          Error events are excluded here (they have their own page).</li>
+      <li><b>Avg time per screen</b> &mdash; from <span class="pill">screen_exited</span>&rsquo;s
+          <code>duration_ms</code>, in seconds. Only durations between <b>0 and 10 minutes</b> are counted;
+          anything longer is treated as the user leaving the phone on the screen and is dropped, so the
+          averages aren&rsquo;t skewed by outliers.</li>
+      <li><b>Notes</b> &mdash; auto-generated one-liners: the biggest funnel drop, abandoned-cart total,
+          longest screen, and a pointer to the Errors page.</li>
+    </ul>
+  </section>
+
+  <section id="errors">
+    <h2>12. Errors page <a class="anchor" href="#errors">#</a></h2>
+    <p>A separate view (<a href="/errors.html">Errors</a>) for failures. Three types:</p>
+    <ul>
+      <li><b>App errors</b> (<span class="pill">app_error</span>) &mdash; crashes and network errors.</li>
+      <li><b>Order failures</b> (<span class="pill">order_place_failed</span>).</li>
+      <li><b>Login failures</b> (<span class="pill">login_failed</span>).</li>
+    </ul>
+    <p>
+      The pills at the top are <b>exact totals</b> for the window. The <b>grouped table</b> below clusters
+      errors by a generated signature (type + message) &mdash; but it is built from the
+      <b>most recent 5,000 matching error events</b> only. For a high-volume window the per-group counts
+      are therefore a recent sample, not the full-window total. First-seen / last-seen / affected-apps
+      on each group are likewise within that sample.
+    </p>
+  </section>
+
+  <section id="faq">
+    <h2>13. FAQ &mdash; likely questions <a class="anchor" href="#faq">#</a></h2>
+    <dl class="faq">
+      <dt>Why doesn&rsquo;t &ldquo;Orders&rdquo; match the count of <code>order_placed</code> events?</dt>
+      <dd>It shouldn&rsquo;t. Orders are counted from <span class="pill">purchase</span>.
+          <span class="pill">order_placed</span> is a legacy event that fires for only a fraction of
+          orders and is used nowhere.</dd>
+
+      <dt>Why does the All-time view say &ldquo;updated 4m ago&rdquo;?</dt>
+      <dd>By design. The 365-day and All-time views are expensive to compute, so they refresh on a
+          ~5-minute cycle instead of every poll. The label is there so a lagging refresh can&rsquo;t be
+          mistaken for live data.</dd>
+
+      <dt>Why is the GMV for &ldquo;Last 365 days&rdquo; different from &ldquo;All time&rdquo;?</dt>
+      <dd>All time includes every order ever; 365 days only includes the last year. If almost all
+          revenue is recent they&rsquo;ll be close, but All time is always &ge; 365 days. (If you ever see
+          the reverse, one of the views is mid-refresh &mdash; reload in a minute.)</dd>
+
+      <dt>The funnel says 80% &times; 50% &times; 60%&hellip; but &ldquo;Of top&rdquo; doesn&rsquo;t match that product. Bug?</dt>
+      <dd>No &mdash; see <a href="#funnel">section 8</a>. The steps are counted independently (event present in
+          the session, yes/no), not as a strict A&rarr;B&rarr;C path, so the per-step rates don&rsquo;t chain
+          exactly.</dd>
+
+      <dt>Why is the conversion number on the chart different from the Conversion KPI?</dt>
+      <dd>The chart corner shows the <i>average of each day/week/month&rsquo;s</i> conversion rate; the KPI is
+          one ratio over the whole window. Quiet early buckets pull the chart average around. Trust the KPI.</dd>
+
+      <dt>Why is app X missing from the leaderboard?</dt>
+      <dd>Either it has no events in the window, or it&rsquo;s on the excluded list (pulled from the App Store,
+          or an internal <span class="pill">vcc</span>/<span class="pill">vccsandbox</span> build). Pick it
+          in the App filter to see its real numbers.</dd>
+
+      <dt>Do these numbers count real people?</dt>
+      <dd>They count <b>devices</b> (<code>anonymous_id</code>, one per install) and <b>sessions</b>, not
+          authenticated users. Reinstalls and multi-device usage inflate user counts.</dd>
+
+      <dt>Is GMV net of refunds?</dt>
+      <dd>No. GMV is gross &mdash; the sum of purchase values at the moment of purchase. Refunds,
+          cancellations and fees are not subtracted.</dd>
+
+      <dt>What timezone are the day buckets in?</dt>
+      <dd>UTC.</dd>
+    </dl>
+  </section>
+
+  <footer>
+    This page describes the dashboard&rsquo;s calculations as implemented in
+    <code>lib/analytics-queries.js</code>. If a definition here and the code ever disagree, the code wins &mdash;
+    please flag it.
+  </footer>
+
+</main>
+
+</body>
+</html>
