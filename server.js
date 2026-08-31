@@ -324,7 +324,12 @@ function askWorker(kind, params, timeoutMs = 60000) {
 const respCache = new Map(); // key -> { at, epoch, body }  (insertion-ordered; head = coldest)
 const pending   = new Map(); // key -> Promise
 const FRESH_MS  = 30000; // matches the dashboard poll; keeps worker load light
-const RESP_CACHE_MAX = 150; // ~app × platform × window combos + the warmed set
+const APP_FRESH_MS = 60000; // a single app's numbers don't need 30s freshness;
+                            // longer TTL + not ingest-invalidated halves the
+                            // recompute rate so many more apps can stay warm
+const RESP_CACHE_MAX = 220; // ~app × platform × window combos + the warmed set;
+                            // a viewed app then stays cached (= instant) for a
+                            // long time regardless of the warm list
 
 // The "last 365 days" and "all time" windows have no timestamp lower bound, so
 // every sub-query scans the whole events table — far too heavy to recompute on
@@ -352,12 +357,14 @@ function getCached(kind, params) {
   const key = cacheKey(kind, params);
   const entry = respCache.get(key);
   const heavy = isHeavyWindow(kind, params);
-  const ttl = heavy ? HEAVY_FRESH_MS : FRESH_MS;
+  const appView = !heavy && kind === 'stats' && !!params.appSlug;
+  const ttl = heavy ? HEAVY_FRESH_MS : appView ? APP_FRESH_MS : FRESH_MS;
   const timeout = heavy ? HEAVY_TIMEOUT_MS : 60000;
 
   if (entry) {
-    // Heavy windows age out on time only; light ones also on any new ingest.
-    const stale = Date.now() - entry.at > ttl || (!heavy && entry.epoch !== statsEpoch);
+    // Heavy + per-app views age out on time only; the light global views also
+    // on any new ingest (they back the constantly-polling default dashboard).
+    const stale = Date.now() - entry.at > ttl || (!heavy && !appView && entry.epoch !== statsEpoch);
     if (stale && !pending.has(key)) {
       const p = askWorker(kind, params, timeout)
         .then(body => {
@@ -421,11 +428,14 @@ app.get('/api/errors', async (req, res) => {
 });
 
 // Drilling into an app from the leaderboard is the common next click, but an
-// app-filtered stats call is otherwise cold. `warmTopApps` keeps the busiest
-// apps warm at the default window, on a slower cadence than the global views so
-// the worker isn't swamped. The list is refreshed by `warmCaches` below.
-const TOP_APPS_WARM = 8;
+// app-filtered stats call is otherwise cold. `warmTopApps` keeps a wide slice
+// of the leaderboard warm at the default window — a small app is cheap to
+// compute now that the covering indexes exist, so this covers essentially every
+// app anyone actually opens. Runs on a slower cadence than the global views so
+// the worker isn't swamped; the list is refreshed by `warmCaches` below.
+const TOP_APPS_WARM = 25;
 let topAppSlugs = [];
+let warmedAppsOnce = false;
 function warmTopApps() {
   if (!indexesReady || !worker) return;
   for (const appSlug of topAppSlugs) {
@@ -437,9 +447,10 @@ function warmTopApps() {
 // never waiting on the worker. Held off until the covering indexes exist.
 function warmCaches() {
   if (!indexesReady || !worker) return;
+  const g30 = getCached('stats', { appSlug: null, platform: null, days: 30 });
   Promise.allSettled([
     getCached('stats', { appSlug: null, platform: null, days: 7 }),
-    getCached('stats', { appSlug: null, platform: null, days: 30 }),
+    g30,
     getCached('stats', { appSlug: null, platform: null, days: 90 }),
     // The expensive windows: warmed here too so a visitor never triggers the
     // full-table scan on the request path. They self-throttle to HEAVY_FRESH_MS.
@@ -447,11 +458,15 @@ function warmCaches() {
     getCached('stats', { appSlug: null, platform: null, days: null }),
     getCached('errors', { appSlug: null, platform: null, days: 30, limit: 50, offset: 0, type: null }),
   ]);
-  // Refresh the top-apps list from the just-computed 30-day leaderboard.
-  const g = respCache.get(cacheKey('stats', { appSlug: null, platform: null, days: 30 }));
-  if (g && g.body && Array.isArray(g.body.perApp)) {
-    topAppSlugs = g.body.perApp.slice(0, TOP_APPS_WARM).map(a => a.app_slug);
-  }
+  // Refresh the top-apps warm list from the 30-day leaderboard, and do the
+  // first per-app warm as soon as that list exists (rather than waiting a full
+  // warmTopApps interval).
+  g30.then(s => {
+    if (s && Array.isArray(s.perApp)) {
+      topAppSlugs = s.perApp.slice(0, TOP_APPS_WARM).map(a => a.app_slug);
+      if (!warmedAppsOnce && topAppSlugs.length) { warmedAppsOnce = true; warmTopApps(); }
+    }
+  }).catch(() => {});
 }
 
 // ── SSE stream ────────────────────────────────────────────────────────────────
@@ -486,5 +501,5 @@ app.listen(PORT, '0.0.0.0', () => {
   // keeps flowing), then warm the common dashboard views and keep them warm.
   setTimeout(() => buildDeferredIndexes(0), 1500);
   setInterval(warmCaches, FRESH_MS).unref();
-  setInterval(warmTopApps, 90000).unref();
+  setInterval(warmTopApps, 150000).unref();
 });
