@@ -298,13 +298,13 @@ function startWorker() {
   });
 }
 
-function askWorker(kind, params) {
+function askWorker(kind, params, timeoutMs = 60000) {
   return new Promise((resolve, reject) => {
     if (!worker) return reject(new Error('worker not started'));
     const id = ++workerSeq;
     const timer = setTimeout(() => {
       if (workerJobs.has(id)) { workerJobs.delete(id); reject(new Error('worker timeout')); }
-    }, 60000);
+    }, timeoutMs);
     workerJobs.set(id, { resolve, reject, timer });
     worker.postMessage({ id, kind, params });
   });
@@ -318,34 +318,56 @@ const respCache = new Map(); // key -> { at, epoch, body }
 const pending   = new Map(); // key -> Promise
 const FRESH_MS  = 30000; // matches the dashboard poll; keeps worker load light
 
+// The "last 365 days" and "all time" windows have no timestamp lower bound, so
+// every sub-query scans the whole events table — far too heavy to recompute on
+// each 30s poll, and their totals barely move minute to minute. Refresh them on
+// a slow cadence, give the worker real headroom to finish, and don't let an
+// ingest invalidate them (they're allowed to lag by up to HEAVY_FRESH_MS).
+const HEAVY_FRESH_MS   = 5 * 60 * 1000;
+const HEAVY_TIMEOUT_MS = 180000;
+function isHeavyWindow(kind, p) {
+  return (kind === 'stats' || kind === 'errors') && (p.days == null || p.days > 180);
+}
+
 function cacheKey(kind, o) {
   return [kind, o.appSlug || '', o.platform || '', o.days || '', o.type || '', o.limit || '', o.offset || ''].join('|');
+}
+
+// Return the cached body with a fresh `_meta` block so the client can tell how
+// old the numbers are — without mutating the shared cached object.
+function withMeta(entry, ttl) {
+  const ageMs = Date.now() - entry.at;
+  return { ...entry.body, _meta: { computedAt: entry.at, ageMs, ttlMs: ttl, stale: ageMs > ttl } };
 }
 
 function getCached(kind, params) {
   const key = cacheKey(kind, params);
   const entry = respCache.get(key);
+  const heavy = isHeavyWindow(kind, params);
+  const ttl = heavy ? HEAVY_FRESH_MS : FRESH_MS;
+  const timeout = heavy ? HEAVY_TIMEOUT_MS : 60000;
 
   if (entry) {
-    const stale = entry.epoch !== statsEpoch || Date.now() - entry.at > FRESH_MS;
+    // Heavy windows age out on time only; light ones also on any new ingest.
+    const stale = Date.now() - entry.at > ttl || (!heavy && entry.epoch !== statsEpoch);
     if (stale && !pending.has(key)) {
-      const p = askWorker(kind, params)
+      const p = askWorker(kind, params, timeout)
         .then(body => { respCache.set(key, { at: Date.now(), epoch: statsEpoch, body }); return body; })
-        .catch(e => console.error(`${kind} refresh:`, e.message))
+        .catch(e => console.error(`${kind} refresh (${key}):`, e.message))
         .finally(() => pending.delete(key));
       pending.set(key, p);
     }
-    return Promise.resolve(entry.body);
+    return Promise.resolve(withMeta(entry, ttl));
   }
 
   if (pending.has(key)) return pending.get(key);
-  const p = askWorker(kind, params)
+  const p = askWorker(kind, params, timeout)
     .then(body => {
       respCache.set(key, { at: Date.now(), epoch: statsEpoch, body });
       if (respCache.size > 60) {
         for (const k of [...respCache.keys()].slice(0, 10)) if (k !== key) respCache.delete(k);
       }
-      return body;
+      return withMeta(respCache.get(key), ttl);
     })
     .finally(() => pending.delete(key));
   pending.set(key, p);
@@ -391,6 +413,10 @@ function warmCaches() {
     getCached('stats', { appSlug: null, platform: null, days: 7 }),
     getCached('stats', { appSlug: null, platform: null, days: 30 }),
     getCached('stats', { appSlug: null, platform: null, days: 90 }),
+    // The expensive windows: warmed here too so a visitor never triggers the
+    // full-table scan on the request path. They self-throttle to HEAVY_FRESH_MS.
+    getCached('stats', { appSlug: null, platform: null, days: 365 }),
+    getCached('stats', { appSlug: null, platform: null, days: null }),
     getCached('errors', { appSlug: null, platform: null, days: 30, limit: 50, offset: 0, type: null }),
   ]);
 }

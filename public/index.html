@@ -634,6 +634,7 @@ function paintLeaderboard() {
   for (const k of LB_NUM_COLS) best[k] = Math.max(0, ...lbData.map(r => r[k]));
   const cell = (r, k, text) => `<td class="num${r[k] > 0 && r[k] === best[k] ? ' lb-best' : ''}">${text}</td>`;
   const trend = (r) => {
+    if (r.prevOrders == null) return '';   // all-time window: no prior period
     const d = r.orders - r.prevOrders;
     if (!r.prevOrders && !r.orders) return '';
     if (d > 0) return ` <span class="trend-up" title="was ${r.prevOrders}">▲</span>`;
@@ -723,7 +724,14 @@ function renderStats(s) {
   set('k-new', fmtInt(newU), d(newU, p.newUsers, 'rel', true));
 
   const appName = currentApp() || 'all apps';
-  document.getElementById('window-label').textContent = `${s.windowLabel || 'last ' + currentDays() + ' days'} · ${appName}`;
+  const meta = s._meta || {};
+  // The 365-day / all-time views are recomputed on a slow cadence; say how old
+  // the numbers are so a lagging refresh can't pass for live data.
+  const age = meta.ageMs > 90000
+    ? ` · updated ${Math.max(1, Math.round(meta.ageMs / 60000))}m ago`
+    : '';
+  document.getElementById('window-label').textContent =
+    `${s.windowLabel || 'last ' + currentDays() + ' days'} · ${appName}${age}`;
 
   // filter dropdowns (preserve selection)
   const asel = document.getElementById('app-filter'), acur = asel.value;
@@ -804,7 +812,16 @@ function currentPlatform() { return document.getElementById('platform-filter').v
 function currentDays() { return document.getElementById('days-filter').value; }
 function statsKey() { return `stats:${currentApp()}|${currentPlatform()}|${currentDays()}`; }
 function paintCached() {
-  try { const raw = localStorage.getItem(statsKey()); if (raw) { renderStats(JSON.parse(raw)); return true; } } catch {}
+  try {
+    const raw = localStorage.getItem(statsKey());
+    if (raw) {
+      // Drop `_meta` — its age is relative to when the blob was cached, which
+      // could be days ago; the live fetch that follows carries a fresh one.
+      const s = JSON.parse(raw); delete s._meta;
+      renderStats(s);
+      return true;
+    }
+  } catch {}
   return false;
 }
 
@@ -812,9 +829,9 @@ let loadSeq = 0;
 async function load() {
   const my = ++loadSeq;
   document.body.classList.add('loading');
-  // A cold window (7d / 365d / all time aren't pre-warmed) can come back 503
-  // "warming up" while the worker computes it — keep the loading bar up and
-  // retry rather than silently leaving the old view in place.
+  // A cold view (an app/platform-filtered one, or any window right after a
+  // restart) can come back 503 "warming up" while the worker computes it — keep
+  // the loading bar up and retry rather than leaving the old view in place.
   const retry = () => { if (my === loadSeq) setTimeout(() => { if (my === loadSeq) load(); }, 3000); };
   try {
     const p = new URLSearchParams();
