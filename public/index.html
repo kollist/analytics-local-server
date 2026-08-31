@@ -812,6 +812,10 @@ let loadSeq = 0;
 async function load() {
   const my = ++loadSeq;
   document.body.classList.add('loading');
+  // A cold window (7d / 365d / all time aren't pre-warmed) can come back 503
+  // "warming up" while the worker computes it — keep the loading bar up and
+  // retry rather than silently leaving the old view in place.
+  const retry = () => { if (my === loadSeq) setTimeout(() => { if (my === loadSeq) load(); }, 3000); };
   try {
     const p = new URLSearchParams();
     if (currentApp()) p.set('app_slug', currentApp());
@@ -819,13 +823,15 @@ async function load() {
     p.set('days', currentDays());
     const r = await fetch('/api/stats?' + p.toString());
     if (my !== loadSeq) return;
-    if (!r.ok) return;
+    if (!r.ok) { retry(); return; }
     const s = await r.json();
-    if (!s || s.error) return;
+    if (my !== loadSeq) return;
+    if (!s || s.error) { retry(); return; }
     renderStats(s);
     try { localStorage.setItem(statsKey(), JSON.stringify(s)); } catch {}
-  } finally {
-    if (my === loadSeq) document.body.classList.remove('loading');
+    document.body.classList.remove('loading');
+  } catch {
+    retry();
   }
 }
 

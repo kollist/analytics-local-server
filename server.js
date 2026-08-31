@@ -388,6 +388,7 @@ app.get('/api/errors', async (req, res) => {
 function warmCaches() {
   if (!indexesReady || !worker) return;
   Promise.allSettled([
+    getCached('stats', { appSlug: null, platform: null, days: 7 }),
     getCached('stats', { appSlug: null, platform: null, days: 30 }),
     getCached('stats', { appSlug: null, platform: null, days: 90 }),
     getCached('errors', { appSlug: null, platform: null, days: 30, limit: 50, offset: 0, type: null }),
