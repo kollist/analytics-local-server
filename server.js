@@ -285,37 +285,102 @@ let statsEpoch = 0; // bumped on every ingest; marks the caches below stale
 // waits on SQLite regardless of how loaded the host is.
 
 let worker = null;
-const workerJobs = new Map(); // id -> { resolve, reject, timer }
+const workerJobs = new Map(); // id -> { resolve, reject, timer, enqueuedAt, depthAtEnqueue, source, kind, params }
 let workerSeq = 0;
+
+// The worker is a single serial FIFO consumer, so user-facing latency is mostly
+// queue wait, not compute. `workerBacklog` is the honest count of jobs the
+// worker still owns — posted, no reply yet — and it is NOT decremented when a
+// job is abandoned on timeout, because the worker keeps running it regardless
+// (better-sqlite3 is synchronous; a posted message can't be recalled). See the
+// `[job]` / `[metrics]` logs and `recordSample` below.
+let workerBacklog = 0;
 
 function startWorker() {
   worker = new Worker(path.join(__dirname, 'analytics-worker.js'), { workerData: { dbDir } });
-  worker.on('message', ({ id, ok, result, error }) => {
+  worker.on('message', ({ id, ok, result, error, startedAt, finishedAt }) => {
+    workerBacklog = Math.max(0, workerBacklog - 1); // the worker is done with it either way
     const job = workerJobs.get(id);
-    if (!job) return;
+    if (!job) {
+      // Abandoned after a timeout — the worker still computed the whole thing
+      // and we throw the result away. This is the wasted work the explicit
+      // queue (drop-at-dequeue) would reclaim.
+      if (startedAt != null) {
+        console.log(`[job] id ${id} DISCARDED (already timed out) queued=${startedAt - (abandonedEnqueue.get(id) || startedAt)}ms compute=${finishedAt - startedAt}ms`);
+        abandonedEnqueue.delete(id);
+      }
+      return;
+    }
     clearTimeout(job.timer);
     workerJobs.delete(id);
+    const queuedMs  = startedAt  != null ? startedAt  - job.enqueuedAt : null;
+    const computeMs = finishedAt != null ? finishedAt - startedAt      : null;
+    recordSample(job.source, queuedMs, computeMs, job.depthAtEnqueue, false);
+    console.log(`[job] ${job.kind} ${jobLabel(job.params)} src=${job.source} queued=${queuedMs}ms compute=${computeMs}ms depth@enq=${job.depthAtEnqueue} (id ${id})`);
     ok ? job.resolve(result) : job.reject(new Error(error || 'worker error'));
   });
   worker.on('error', (e) => console.error('worker error:', e.message));
   worker.on('exit', (code) => {
     for (const job of workerJobs.values()) { clearTimeout(job.timer); job.reject(new Error('worker exited')); }
     workerJobs.clear();
+    workerBacklog = 0;
+    abandonedEnqueue.clear();
     if (code !== 0) { console.error(`worker exited (${code}); restarting in 1s`); setTimeout(startWorker, 1000); }
   });
 }
 
-function askWorker(kind, params, timeoutMs = 60000) {
+const abandonedEnqueue = new Map(); // id -> enqueuedAt, kept only to log discarded-job queue wait
+
+function jobLabel(p = {}) {
+  return `${p.appSlug || 'all'}/${p.platform || 'all'}/${p.days == null ? 'ALL' : p.days + 'd'}`;
+}
+
+function askWorker(kind, params, timeoutMs = 60000, source = 'other') {
   return new Promise((resolve, reject) => {
     if (!worker) return reject(new Error('worker not started'));
     const id = ++workerSeq;
+    const enqueuedAt = Date.now();
+    const depthAtEnqueue = workerBacklog; // jobs the worker must clear before this one
     const timer = setTimeout(() => {
-      if (workerJobs.has(id)) { workerJobs.delete(id); reject(new Error('worker timeout')); }
+      if (workerJobs.has(id)) {
+        workerJobs.delete(id);
+        abandonedEnqueue.set(id, enqueuedAt);
+        recordSample(source, timeoutMs, null, depthAtEnqueue, true);
+        console.warn(`[job] ${kind} ${jobLabel(params)} src=${source} TIMEOUT ${timeoutMs}ms depth@enq=${depthAtEnqueue} (id ${id}, still running on worker)`);
+        reject(new Error('worker timeout'));
+      }
     }, timeoutMs);
-    workerJobs.set(id, { resolve, reject, timer });
+    workerJobs.set(id, { resolve, reject, timer, enqueuedAt, depthAtEnqueue, source, kind, params });
+    workerBacklog++;
     worker.postMessage({ id, kind, params });
   });
 }
+
+// ── Worker / cache metrics ───────────────────────────────────────────────────
+// Rolling 60s window: p50/p95 queue wait and compute time split by source
+// (interactive = a browser is blocked on it; warm = warmTopApps/warmCaches;
+// refresh = background revalidate, nobody waiting), plus cache hit/miss/coalesce
+// so we can see what the warm loop is actually buying.
+let _cacheHit = 0, _cacheMiss = 0, _cacheCoalesced = 0, _http503 = 0;
+const _samples = []; // { source, queuedMs, computeMs, depth, abandoned }
+function recordSample(source, queuedMs, computeMs, depth, abandoned) {
+  _samples.push({ source: source || 'other', queuedMs, computeMs, depth, abandoned });
+}
+function _pct(xs, p) {
+  const v = xs.filter(n => n != null).sort((a, b) => a - b);
+  return v.length ? v[Math.min(v.length - 1, Math.floor((p / 100) * v.length))] : null;
+}
+setInterval(() => {
+  const bySrc = {};
+  for (const s of _samples) (bySrc[s.source] ||= []).push(s);
+  const parts = Object.entries(bySrc).map(([src, ss]) => {
+    const q = ss.map(s => s.queuedMs), c = ss.map(s => s.computeMs);
+    const ab = ss.filter(s => s.abandoned).length;
+    return `${src}(n=${ss.length}${ab ? ` timeout=${ab}` : ''} queued p50=${_pct(q, 50)} p95=${_pct(q, 95)} compute p50=${_pct(c, 50)} p95=${_pct(c, 95)})`;
+  });
+  console.log(`[metrics 60s] cache hit=${_cacheHit} miss=${_cacheMiss} coalesced=${_cacheCoalesced} http503=${_http503} | backlog_now=${workerBacklog} tracked=${workerJobs.size} | ${parts.join(' ') || 'no jobs'}`);
+  _samples.length = 0; _cacheHit = _cacheMiss = _cacheCoalesced = _http503 = 0;
+}, 60000).unref();
 
 // Stale-while-revalidate cache in front of the worker. A request is answered
 // from cache immediately; if the entry is stale a single background refresh is
@@ -331,15 +396,49 @@ const RESP_CACHE_MAX = 220; // ~app × platform × window combos + the warmed se
                             // a viewed app then stays cached (= instant) for a
                             // long time regardless of the warm list
 
-// The "last 365 days" and "all time" windows have no timestamp lower bound, so
-// every sub-query scans the whole events table — far too heavy to recompute on
-// each 30s poll, and their totals barely move minute to minute. Refresh them on
-// a slow cadence, give the worker real headroom to finish, and don't let an
-// ingest invalidate them (they're allowed to lag by up to HEAVY_FRESH_MS).
+// The "last 365 days" window still scans a wide slice of the events table — far
+// too heavy to recompute on each 30s poll, and its totals barely move minute to
+// minute. Refresh on a slow cadence and don't let an ingest invalidate it (it's
+// allowed to lag by up to HEAVY_FRESH_MS).
 const HEAVY_FRESH_MS   = 5 * 60 * 1000;
-const HEAVY_TIMEOUT_MS = 180000;
 function isHeavyWindow(kind, p) {
   return (kind === 'stats' || kind === 'errors') && (p.days == null || p.days > 180);
+}
+
+// How long a browser request blocks before we 503 it. Decoupled from the worker
+// job: on this deadline the HTTP handler gives up, but the job keeps running and
+// its result still fills the cache — so a same-key retry (or the next 30s poll)
+// is an instant hit instead of kicking off a duplicate scan. The job only gets
+// force-abandoned after JOB_SAFETY_MS, which should only ever fire on a wedged
+// worker.
+const HTTP_WAIT_MS   = 30000;
+const JOB_SAFETY_MS  = 15 * 60 * 1000;
+
+function raceDeadline(p, ms) {
+  let t;
+  const deadline = new Promise((_, rej) => { t = setTimeout(() => rej(new Error('worker timeout')), ms); });
+  return Promise.race([p.finally(() => clearTimeout(t)), deadline]);
+}
+
+// Start (or return the in-flight) worker job for a key; on completion it owns
+// writing the cache entry and LRU-evicting. Kept in `pending` until it settles.
+function startJob(kind, params, source, key) {
+  if (pending.has(key)) return pending.get(key);
+  const p = askWorker(kind, params, JOB_SAFETY_MS, source)
+    .then(body => {
+      respCache.delete(key); // delete-then-set moves a live key to the tail (LRU)
+      respCache.set(key, { at: Date.now(), epoch: statsEpoch, body });
+      if (respCache.size > RESP_CACHE_MAX) {
+        const drop = respCache.size - RESP_CACHE_MAX + 8;
+        for (const k of [...respCache.keys()].slice(0, drop)) if (k !== key) respCache.delete(k);
+      }
+      return body;
+    })
+    .catch(e => { console.error(`${kind} job (${key}):`, e.message); throw e; })
+    .finally(() => pending.delete(key));
+  pending.set(key, p);
+  p.catch(() => {}); // fire-and-forget callers (stale refresh) don't await `p`
+  return p;
 }
 
 function cacheKey(kind, o) {
@@ -353,47 +452,27 @@ function withMeta(entry, ttl) {
   return { ...entry.body, _meta: { computedAt: entry.at, ageMs, ttlMs: ttl, stale: ageMs > ttl } };
 }
 
-function getCached(kind, params) {
+function getCached(kind, params, source = 'other') {
   const key = cacheKey(kind, params);
   const entry = respCache.get(key);
   const heavy = isHeavyWindow(kind, params);
   const appView = !heavy && kind === 'stats' && !!params.appSlug;
   const ttl = heavy ? HEAVY_FRESH_MS : appView ? APP_FRESH_MS : FRESH_MS;
-  const timeout = heavy ? HEAVY_TIMEOUT_MS : 60000;
 
   if (entry) {
+    _cacheHit++;
     // Heavy + per-app views age out on time only; the light global views also
     // on any new ingest (they back the constantly-polling default dashboard).
     const stale = Date.now() - entry.at > ttl || (!heavy && !appView && entry.epoch !== statsEpoch);
-    if (stale && !pending.has(key)) {
-      const p = askWorker(kind, params, timeout)
-        .then(body => {
-          // delete-then-set so a still-used key moves to the tail (Map keeps
-          // insertion order, and eviction below drops from the head).
-          respCache.delete(key);
-          respCache.set(key, { at: Date.now(), epoch: statsEpoch, body });
-          return body;
-        })
-        .catch(e => console.error(`${kind} refresh (${key}):`, e.message))
-        .finally(() => pending.delete(key));
-      pending.set(key, p);
-    }
+    if (stale) startJob(kind, params, 'refresh', key); // background; nobody waits
     return Promise.resolve(withMeta(entry, ttl));
   }
 
-  if (pending.has(key)) return pending.get(key);
-  const p = askWorker(kind, params, timeout)
-    .then(body => {
-      respCache.set(key, { at: Date.now(), epoch: statsEpoch, body });
-      if (respCache.size > RESP_CACHE_MAX) {
-        const drop = respCache.size - RESP_CACHE_MAX + 8;
-        for (const k of [...respCache.keys()].slice(0, drop)) if (k !== key) respCache.delete(k);
-      }
-      return withMeta(respCache.get(key), ttl);
-    })
-    .finally(() => pending.delete(key));
-  pending.set(key, p);
-  return p;
+  if (pending.has(key)) _cacheCoalesced++; else _cacheMiss++;
+  const job = startJob(kind, params, source, key);
+  return raceDeadline(job, HTTP_WAIT_MS)
+    .then(() => withMeta(respCache.get(key), ttl))
+    .catch(e => { if (source === 'interactive') _http503++; throw e; });
 }
 
 app.get('/api/stats', async (req, res) => {
@@ -405,7 +484,7 @@ app.get('/api/stats', async (req, res) => {
       : Math.min(Math.max(parseInt(req.query.days, 10) || 30, 1), 365),
   };
   try {
-    res.json(await getCached('stats', params));
+    res.json(await getCached('stats', params, 'interactive'));
   } catch (e) {
     res.status(503).json({ error: 'stats are warming up, retry shortly', detail: e.message });
   }
@@ -421,25 +500,26 @@ app.get('/api/errors', async (req, res) => {
     type: req.query.type || null,
   };
   try {
-    res.json(await getCached('errors', params));
+    res.json(await getCached('errors', params, 'interactive'));
   } catch (e) {
     res.status(503).json({ error: 'errors view is busy, retry shortly', detail: e.message });
   }
 });
 
 // Drilling into an app from the leaderboard is the common next click, but an
-// app-filtered stats call is otherwise cold. `warmTopApps` keeps a wide slice
-// of the leaderboard warm at the default window — a small app is cheap to
-// compute now that the covering indexes exist, so this covers essentially every
-// app anyone actually opens. Runs on a slower cadence than the global views so
-// the worker isn't swamped; the list is refreshed by `warmCaches` below.
-const TOP_APPS_WARM = 25;
+// app-filtered stats call is otherwise cold. `warmTopApps` keeps a slice of the
+// leaderboard warm at the default window. On a single serial worker this is also
+// the bulk of the queue depth (N apps × ~45 statements every WARM_TOP_APPS_MS),
+// so it's now tunable — default keeps the old behavior (25); set WARM_TOP_APPS=0
+// to measure whether it buys any interactive cache hits at all.
+const TOP_APPS_WARM     = Math.max(0, parseInt(process.env.WARM_TOP_APPS ?? '25', 10) || 0);
+const WARM_TOP_APPS_MS  = Math.max(30000, parseInt(process.env.WARM_TOP_APPS_MS, 10) || 150000);
 let topAppSlugs = [];
 let warmedAppsOnce = false;
 function warmTopApps() {
-  if (!indexesReady || !worker) return;
+  if (!indexesReady || !worker || TOP_APPS_WARM === 0) return;
   for (const appSlug of topAppSlugs) {
-    getCached('stats', { appSlug, platform: null, days: 30 });
+    getCached('stats', { appSlug, platform: null, days: 30 }, 'warm');
   }
 }
 
@@ -447,16 +527,16 @@ function warmTopApps() {
 // never waiting on the worker. Held off until the covering indexes exist.
 function warmCaches() {
   if (!indexesReady || !worker) return;
-  const g30 = getCached('stats', { appSlug: null, platform: null, days: 30 });
+  const g30 = getCached('stats', { appSlug: null, platform: null, days: 30 }, 'warm');
   Promise.allSettled([
-    getCached('stats', { appSlug: null, platform: null, days: 7 }),
+    getCached('stats', { appSlug: null, platform: null, days: 7 }, 'warm'),
     g30,
-    getCached('stats', { appSlug: null, platform: null, days: 90 }),
+    getCached('stats', { appSlug: null, platform: null, days: 90 }, 'warm'),
     // The expensive windows: warmed here too so a visitor never triggers the
     // full-table scan on the request path. They self-throttle to HEAVY_FRESH_MS.
-    getCached('stats', { appSlug: null, platform: null, days: 365 }),
-    getCached('stats', { appSlug: null, platform: null, days: null }),
-    getCached('errors', { appSlug: null, platform: null, days: 30, limit: 50, offset: 0, type: null }),
+    getCached('stats', { appSlug: null, platform: null, days: 365 }, 'warm'),
+    getCached('stats', { appSlug: null, platform: null, days: null }, 'warm'),
+    getCached('errors', { appSlug: null, platform: null, days: 30, limit: 50, offset: 0, type: null }, 'warm'),
   ]);
   // Refresh the top-apps warm list from the 30-day leaderboard, and do the
   // first per-app warm as soon as that list exists (rather than waiting a full
@@ -501,5 +581,5 @@ app.listen(PORT, '0.0.0.0', () => {
   // keeps flowing), then warm the common dashboard views and keep them warm.
   setTimeout(() => buildDeferredIndexes(0), 1500);
   setInterval(warmCaches, FRESH_MS).unref();
-  setInterval(warmTopApps, 150000).unref();
+  if (TOP_APPS_WARM > 0) setInterval(warmTopApps, WARM_TOP_APPS_MS).unref();
 });

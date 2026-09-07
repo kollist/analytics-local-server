@@ -17,11 +17,14 @@ db.pragma('temp_store = MEMORY');
 
 parentPort.on('message', (msg) => {
   const { id, kind, params } = msg;
-  const t0 = Date.now();
+  // `startedAt` is the moment the worker dequeued this job; the gap between it
+  // and the server's enqueue time is pure queue wait. Wall clock (Date.now) is
+  // consistent across threads on one host, so the server can diff the two.
+  const startedAt = Date.now();
   try {
     const result = kind === 'errors' ? computeErrors(db, params) : computeStats(db, params);
-    parentPort.postMessage({ id, ok: true, result, ms: Date.now() - t0 });
+    parentPort.postMessage({ id, ok: true, result, startedAt, finishedAt: Date.now() });
   } catch (e) {
-    parentPort.postMessage({ id, ok: false, error: e.message, ms: Date.now() - t0 });
+    parentPort.postMessage({ id, ok: false, error: e.message, startedAt, finishedAt: Date.now() });
   }
 });
